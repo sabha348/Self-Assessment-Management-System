@@ -1,0 +1,84 @@
+2025-01-05 17:49:49,190 - DEBUG - Script started with arguments: ['evaluate_answers.py', 'how would you read this statement for maximal understanding from start to finish step by step(dont tell me what to do instead what would you do (as ai)', '5']
+2025-01-05 17:49:49,190 - DEBUG - Starting assessment with text: how would you read this statement for maximal understanding from start to finish step by step(dont t...
+2025-01-05 17:49:49,190 - DEBUG - Initializing AssessmentSystem
+2025-01-05 17:49:49,190 - DEBUG - Generating questions
+2025-01-05 17:49:49,215 - DEBUG - Starting new HTTPS connection (1): api-inference.huggingface.co:443
+2025-01-05 17:49:51,915 - DEBUG - https://api-inference.huggingface.co:443 "POST /models/Qwen/Qwen2.5-Coder-32B-Instruct/v1/chat/completions HTTP/1.1" 400 72
+2025-01-05 17:49:51,915 - ERROR - Error in handle_assessment: Failed to generate questions
+Traceback (most recent call last):
+  File "C:\Users\toshiba\Downloads\Assessment Management System\backend\evaluate_answers.py", line 39, in handle_assessment
+    raise Exception("Failed to generate questions")
+Exception: Failed to generate questions
+2025-01-05 17:49:51,915 - ERROR - Fatal error: Failed to generate questions
+Traceback (most recent call last):
+  File "C:\Users\toshiba\Downloads\Assessment Management System\backend\evaluate_answers.py", line 107, in <module>
+    results = handle_assessment(input_text, num_questions)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\toshiba\Downloads\Assessment Management System\backend\evaluate_answers.py", line 39, in handle_assessment
+    raise Exception("Failed to generate questions")
+Exception: Failed to generate questions
+2025-01-05 17:51:26,820 - DEBUG - Script started with arguments: ['evaluate_answers.py', 'how would you read this statement for maximal understanding from start to finish step by step(dont tell me what to do instead what would you do (as ai)', '5']
+2025-01-05 17:51:26,820 - DEBUG - Starting assessment with text: how would you read this statement for maximal understanding from start to finish step by step(dont t...
+2025-01-05 17:51:26,820 - DEBUG - Initializing AssessmentSystem
+2025-01-05 17:51:26,864 - DEBUG - Generating questions
+2025-01-05 17:51:26,884 - DEBUG - Starting new HTTPS connection (1): api-inference.huggingface.co:443
+2025-01-05 17:51:31,606 - DEBUG - https://api-inference.huggingface.co:443 "POST /models/Qwen/Qwen2.5-Coder-32B-Instruct/v1/chat/completions HTTP/1.1" 200 782
+2025-01-05 17:51:31,606 - DEBUG - Generating correct answers
+2025-01-05 17:51:32,284 - DEBUG - https://api-inference.huggingface.co:443 "POST /models/Qwen/Qwen2.5-Coder-32B-Instruct/v1/chat/completions HTTP/1.1" 200 1768
+2025-01-05 17:51:32,612 - DEBUG - https://api-inference.huggingface.co:443 "POST /models/Qwen/Qwen2.5-Coder-32B-Instruct/v1/chat/completions HTTP/1.1" 200 1072
+2025-01-05 17:51:32,993 - DEBUG - https://api-inference.huggingface.co:443 "POST /models/Qwen/Qwen2.5-Coder-32B-Instruct/v1/chat/completions HTTP/1.1" 200 1063
+2025-01-05 17:51:33,483 - DEBUG - https://api-inference.huggingface.co:443 "POST /models/Qwen/Qwen2.5-Coder-32B-Instruct/v1/chat/completions HTTP/1.1" 200 1657
+2025-01-05 17:51:34,577 - DEBUG - https://api-inference.huggingface.co:443 "POST /models/Qwen/Qwen2.5-Coder-32B-Instruct/v1/chat/completions HTTP/1.1" 200 1858
+2025-01-05 17:51:34,577 - DEBUG - Assessment completed successfully
+2025-01-05 21:13:04,523 - DEBUG - Script started with arguments: ['evaluate_answers.py', 'hello my name is sahil, i love reading books and right now i am building a software', '5']
+2025-01-05 21:13:04,523 - DEBUG - Starting assessment with text: hello my name is sahil, i love reading books and right now i am building a software...
+2025-01-05 21:13:04,523 - DEBUG - Initializing AssessmentSystem
+2025-01-05 21:13:04,538 - DEBUG - Generating questions
+2025-01-05 21:13:04,560 - DEBUG - Starting new HTTPS connection (1): api-inference.huggingface.co:443
+2025-01-05 21:13:07,172 - DEBUG - https://api-inference.huggingface.co:443 "POST /models/Qwen/Qwen2.5-Coder-32B-Instruct/v1/chat/completions HTTP/1.1" 200 None
+2025-01-05 21:13:07,188 - DEBUG - Generating correct answers
+2025-01-05 21:13:08,007 - DEBUG - https://api-inference.huggingface.co:443 "POST /models/Qwen/Qwen2.5-Coder-32B-Instruct/v1/chat/completions HTTP/1.1" 200 None
+2025-01-05 21:13:08,682 - DEBUG - https://api-inference.huggingface.co:443 "POST /models/Qwen/Qwen2.5-Coder-32B-Instruct/v1/chat/completions HTTP/1.1" 200 None
+2025-01-05 21:13:10,034 - DEBUG - https://api-inference.huggingface.co:443 "POST /models/Qwen/Qwen2.5-Coder-32B-Instruct/v1/chat/completions HTTP/1.1" 200 None
+2025-01-05 21:13:11,760 - DEBUG - https://api-inference.huggingface.co:443 "POST /models/Qwen/Qwen2.5-Coder-32B-Instruct/v1/chat/completions HTTP/1.1" 200 None
+2025-01-05 21:13:12,806 - DEBUG - https://api-inference.huggingface.co:443 "POST /models/Qwen/Qwen2.5-Coder-32B-Instruct/v1/chat/completions HTTP/1.1" 200 None
+2025-01-05 21:13:12,806 - DEBUG - Assessment completed successfully
+2025-01-05 21:52:52,665 - DEBUG - Script started with arguments: ['evaluate_answers.py', 'hello my name is sahil', '5']
+2025-01-05 21:52:52,680 - DEBUG - Starting assessment with text: hello my name is sahil...
+2025-01-05 21:52:52,680 - DEBUG - Initializing AssessmentSystem
+2025-01-05 21:52:52,680 - DEBUG - Generating questions
+2025-01-05 21:52:52,696 - DEBUG - Starting new HTTPS connection (1): api-inference.huggingface.co:443
+2025-01-05 21:52:55,056 - DEBUG - https://api-inference.huggingface.co:443 "POST /models/Qwen/Qwen2.5-Coder-32B-Instruct/v1/chat/completions HTTP/1.1" 200 None
+2025-01-05 21:52:55,071 - DEBUG - Generating correct answers
+2025-01-05 21:52:55,671 - DEBUG - https://api-inference.huggingface.co:443 "POST /models/Qwen/Qwen2.5-Coder-32B-Instruct/v1/chat/completions HTTP/1.1" 200 None
+2025-01-05 21:52:56,841 - DEBUG - https://api-inference.huggingface.co:443 "POST /models/Qwen/Qwen2.5-Coder-32B-Instruct/v1/chat/completions HTTP/1.1" 200 None
+2025-01-05 21:52:57,527 - DEBUG - https://api-inference.huggingface.co:443 "POST /models/Qwen/Qwen2.5-Coder-32B-Instruct/v1/chat/completions HTTP/1.1" 200 None
+2025-01-05 21:52:59,720 - DEBUG - https://api-inference.huggingface.co:443 "POST /models/Qwen/Qwen2.5-Coder-32B-Instruct/v1/chat/completions HTTP/1.1" 200 None
+2025-01-05 21:53:00,998 - DEBUG - https://api-inference.huggingface.co:443 "POST /models/Qwen/Qwen2.5-Coder-32B-Instruct/v1/chat/completions HTTP/1.1" 200 None
+2025-01-05 21:53:00,998 - DEBUG - Assessment completed successfully
+2025-01-05 22:08:11,271 - DEBUG - Script started with arguments: ['evaluate_answers.py', 'hello my name is sahil', '5']
+2025-01-05 22:08:11,286 - DEBUG - Starting assessment with text: hello my name is sahil...
+2025-01-05 22:08:11,286 - DEBUG - Initializing AssessmentSystem
+2025-01-05 22:08:11,286 - DEBUG - Generating questions
+2025-01-05 22:08:11,286 - DEBUG - Starting new HTTPS connection (1): api-inference.huggingface.co:443
+2025-01-05 22:08:12,411 - DEBUG - https://api-inference.huggingface.co:443 "POST /models/Qwen/Qwen2.5-Coder-32B-Instruct/v1/chat/completions HTTP/1.1" 200 522
+2025-01-05 22:08:12,411 - DEBUG - Generating correct answers
+2025-01-05 22:08:12,802 - DEBUG - https://api-inference.huggingface.co:443 "POST /models/Qwen/Qwen2.5-Coder-32B-Instruct/v1/chat/completions HTTP/1.1" 200 358
+2025-01-05 22:08:13,130 - DEBUG - https://api-inference.huggingface.co:443 "POST /models/Qwen/Qwen2.5-Coder-32B-Instruct/v1/chat/completions HTTP/1.1" 200 420
+2025-01-05 22:08:13,458 - DEBUG - https://api-inference.huggingface.co:443 "POST /models/Qwen/Qwen2.5-Coder-32B-Instruct/v1/chat/completions HTTP/1.1" 200 372
+2025-01-05 22:08:13,802 - DEBUG - https://api-inference.huggingface.co:443 "POST /models/Qwen/Qwen2.5-Coder-32B-Instruct/v1/chat/completions HTTP/1.1" 200 379
+2025-01-05 22:08:14,146 - DEBUG - https://api-inference.huggingface.co:443 "POST /models/Qwen/Qwen2.5-Coder-32B-Instruct/v1/chat/completions HTTP/1.1" 200 357
+2025-01-05 22:08:14,146 - DEBUG - Assessment completed successfully
+2025-01-05 22:10:41,036 - DEBUG - Script started with arguments: ['evaluate_answers.py', 'hello my name is sahil', '5']
+2025-01-05 22:10:41,036 - DEBUG - Starting assessment with text: hello my name is sahil...
+2025-01-05 22:10:41,036 - DEBUG - Initializing AssessmentSystem
+2025-01-05 22:10:41,036 - DEBUG - Generating questions
+2025-01-05 22:10:41,036 - DEBUG - Starting new HTTPS connection (1): api-inference.huggingface.co:443
+2025-01-05 22:10:42,036 - DEBUG - https://api-inference.huggingface.co:443 "POST /models/Qwen/Qwen2.5-Coder-32B-Instruct/v1/chat/completions HTTP/1.1" 200 522
+2025-01-05 22:10:42,036 - DEBUG - Generating correct answers
+2025-01-05 22:10:42,349 - DEBUG - https://api-inference.huggingface.co:443 "POST /models/Qwen/Qwen2.5-Coder-32B-Instruct/v1/chat/completions HTTP/1.1" 200 358
+2025-01-05 22:10:42,677 - DEBUG - https://api-inference.huggingface.co:443 "POST /models/Qwen/Qwen2.5-Coder-32B-Instruct/v1/chat/completions HTTP/1.1" 200 420
+2025-01-05 22:10:42,989 - DEBUG - https://api-inference.huggingface.co:443 "POST /models/Qwen/Qwen2.5-Coder-32B-Instruct/v1/chat/completions HTTP/1.1" 200 372
+2025-01-05 22:10:43,302 - DEBUG - https://api-inference.huggingface.co:443 "POST /models/Qwen/Qwen2.5-Coder-32B-Instruct/v1/chat/completions HTTP/1.1" 200 379
+2025-01-05 22:10:43,661 - DEBUG - https://api-inference.huggingface.co:443 "POST /models/Qwen/Qwen2.5-Coder-32B-Instruct/v1/chat/completions HTTP/1.1" 200 357
+2025-01-05 22:10:43,661 - DEBUG - Assessment completed successfully
