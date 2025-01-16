@@ -25,15 +25,15 @@ function runPythonProcess(scriptName, args) {
     let errorData = "";
 
     // Set timeout for process
-    const timeout = setTimeout(() => {
+    let timeout = 12000;
+    const timeoutId = setTimeout(() => {
       pythonProcess.kill();
-      reject(new Error("Process timed out after 120 seconds"));
-    }, 120000);
+      reject(new Error(`Process timed out after ${timeout/1000} seconds`));
+    }, timeout);
 
     pythonProcess.stdout.on("data", (data) => {
       outputData += data.toString();
     });
-    console.log("Output data:", outputData);
 
     pythonProcess.stderr.on("data", (data) => {
       console.error("Python stderr:", data.toString());
@@ -59,7 +59,7 @@ function runPythonProcess(scriptName, args) {
         resolve(outputData);
       } catch (e) {
         console.error("Output that failed to parse:", outputData);
-        reject(new Error(`Failed to parse Python output: ${e.message}`));
+        reject(new Error(`Failed to parse Python output or did not receive data on stdout: ${e.message}`));
       }
     });
   });
@@ -76,30 +76,29 @@ app.post("/api/assessment", async (req, res) => {
 
     // Generate a unique session ID
     const sessionId = Date.now().toString();
-
     
-    let questions = await runPythonProcess("evaluate_answers.py", [
-      text,
-      numQuestions.toString(),
-    ]);
+    // let questionsString = await runPythonProcess("questions.py", [
+    //   text,
+    //   numQuestions.toString(),
+    // ]);
 
-    // Remove unwanted characters and split the string into an array
-    let Formatted_questions = questions
-        // Remove hyphens
-        .replace(/\-/g,'')
-        .split('\n')
-        .map(question => question.trim())
-        .filter(question => question !== ''); // Filter out empty strings
+   let questionsString = `["- What is the speaker's name?", "- What does the speaker introduce themselves with?", "- What are the last three words the speaker says?", "- How many words does the speaker use to introduce themselves?", "- What is the first letter of the speaker's name?"]`;
+   // Parse the questions string into an array
+   let questionsArray = JSON.parse(questionsString);
+    // Remove the '-' from each question
+   questionsArray = questionsArray.map(question => question.replace(/^-\s*/, ''));
 
-    // // Send only questions to client
-    // res.json({ sessionId, questions: Formatted_questions });
+    // Send only questions to client
+   res.json({ sessionId, questions: questionsArray });
 
     // generate actual answers to questions
-    // const correct_answers = await runPythonProcess("correct_answers.py", [
-    //   text,
-    //   questions,
-    // ]);
-    // console.log("Correct answers:", correct_answers);
+    const correct_answers_String = await runPythonProcess("correct_answers.py", [
+      text,
+      JSON.stringify(questionsArray), // Convert the array to a JSON string    
+      ]);
+
+    let correct_answers_Array = JSON.parse(correct_answers_String);
+    console.log("Correct answers:", correct_answers_Array);
 
     // Save questions to the database
     // await saveQuestions(Formatted_questions, 'Q');
@@ -155,7 +154,7 @@ app.post("/api/assessment/:sessionId/submit", async (req, res) => {
         answers,
       };
       console.log("Evaluation data:", evalData);
-      const results = await runPythonProcess("evaluate_answers.py", [
+      const results = await runPythonProcess("questions.py", [
         JSON.stringify(evalData),
       ]);
 

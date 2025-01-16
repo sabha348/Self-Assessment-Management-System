@@ -3,7 +3,6 @@ from dotenv import load_dotenv
 load_dotenv()
 import sys
 import json
-import logging
 from typing import Dict, List
 from assessment_system import AssessmentSystem
 
@@ -43,7 +42,7 @@ def handle_assessment(input_text: str, num_questions: int = 5) -> Dict:
 
         # Generate questions
         # logger.debug("Generating questions")
-        questions = assessment.generate_questions(input_text="hello my name is Sahil", num_questions=5)
+        questions = assessment.generate_questions(input_text, num_questions)
         if not questions:
             raise Exception("Failed to generate questions")
 
@@ -52,12 +51,8 @@ def handle_assessment(input_text: str, num_questions: int = 5) -> Dict:
         # correct_answers = assessment.generate_correct_answers(input_text, questions)
 
         # logger.debug("Assessment completed successfully")
-
-        print("before return",questions)
-        return {
-            "questions": questions,
-            # "correctAnswers": correct_answers
-        }
+        return questions
+    
     except Exception as e:
         # logger.error(f"Error in handle_assessment: {str(e)}", exc_info=True)
         raise
@@ -115,8 +110,8 @@ if __name__ == "__main__":
         #     results = evaluate_answers(answers_data)
         # else:
             # Handle initial assessment
-        input_text = "hello my name is Sahil"
-        num_questions = 5
+        input_text = sys.argv[1] if len(sys.argv) > 1 else "hello my name is Sahil"
+        num_questions = int(sys.argv[2]) if len(sys.argv) > 2 else 5
         results = handle_assessment(input_text, num_questions)
 
         # Ensure proper JSON encoding of the results

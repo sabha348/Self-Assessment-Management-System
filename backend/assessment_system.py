@@ -89,8 +89,7 @@ class AssessmentSystem:
             )
 
             generated_text = completion.choices[0].message.content
-            # print(generated_text)
-            # More robust question parsing
+            
             questions = [
                 q.strip()
                 for q in re.split(r'\n+', generated_text)
@@ -145,7 +144,6 @@ class AssessmentSystem:
                 print(f"Answer generation error: {e}")
                 correct_answers.append("Unable to generate answer")
 
-        print(correct_answers)
         return correct_answers
 
 
