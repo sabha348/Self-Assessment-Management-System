@@ -5,7 +5,10 @@ const bodyParser = require("body-parser");
 const mongoose = require("mongoose");
 const Question = require("./models/question");
 require('dotenv').config();
+const authRoutes = require("./routes/auth");
 const uri = process.env.MONGODB_URI;
+const userRoutes = require('./routes/userRouter');
+const connectDB = require('./config/db');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -13,6 +16,8 @@ const port = process.env.PORT || 3000;
 // Middleware
 app.use(cors());
 app.use(bodyParser.json());
+
+connectDB();
 
 
 // Helper function to run Python process
@@ -187,15 +192,20 @@ app.listen(port, () => {
   console.log(`Assessment server running on port ${port}`);
 });
 
-mongoose
-  .connect(
-    uri
-  )
-  .then(() => {
-    app.listen(5000, () => {
-      console.log("Database connected and server running on port 5000");
-    });
-  })
-  .catch((err) => {
-    console.log(err);
-  });
+// mongoose
+//   .connect(
+//     uri
+//   )
+//   .then(() => {
+//     app.listen(5000, () => {
+//       console.log("Database connected and server running on port 5000");
+//     });
+//   })
+//   .catch((err) => {
+//     console.log(err);
+//   });
+
+
+app.use('api/auth',authRoutes);
+
+app.use('/user',userRoutes);
