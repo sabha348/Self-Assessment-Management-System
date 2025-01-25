@@ -14,6 +14,7 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 let correct_answers=[];
+let questionsArray = [];
 
 // Middleware
 app.use(cors());
@@ -91,7 +92,7 @@ app.post("/api/assessment", async (req, res) => {
 
    let questionsString = `["- What is the speaker's name?", "- What does the speaker introduce themselves with?", "- What are the last three words the speaker says?", "- How many words does the speaker use to introduce themselves?", "- What is the first letter of the speaker's name?"]`;
    // Parse the questions string into an array
-   let questionsArray = JSON.parse(questionsString);
+   questionsArray = JSON.parse(questionsString);
     // Remove the '-' from each question
    questionsArray = questionsArray.map(question => question.replace(/^-\s*/, ''));
 
@@ -147,11 +148,11 @@ async function saveQuestions(Formatted_questions, prefix = 'Q') {
 app.post("/api/assessment/:sessionId/submit", async (req, res) => {
   try {
     const { sessionId } = req.params;
-    const { user_answers } = req.body;
+    const { answers } = req.body;
 
-    // if (!answers || !Array.isArray(answers)) {
-    //   return res.status(400).json({ error: "Answers array is required" });
-    // }
+    if (!answers || !Array.isArray(answers)) {
+      return res.status(400).json({ error: "Answers array is required" });
+    }
 
     // const assessment = assessmentResults.get(sessionId);
     // if (!assessment) {
@@ -159,24 +160,44 @@ app.post("/api/assessment/:sessionId/submit", async (req, res) => {
     // }
     
     // console.log(assessmentResults);
-    console.log(correct_answers);
+    // console.log(correct_answers);
     try {
-      // const evalData = {
-      //   user_answers,
-      //   correct_answers,
-      // };
+      const evalData = {
+        answers,
+        correct_answers,
+      };
       // console.log("Evaluation data:", evalData);
       const results = await runPythonProcess("evaluate_answers.py", [
-        // JSON.stringify(evalData),
-        JSON.stringify(user_answers),
-        JSON.stringify(correct_answers)
+        JSON.stringify(evalData),
+        // JSON.stringify(user_answers),
+        // JSON.stringify(correct_answers)
       ]);
 
       results_Array = JSON.parse(results);
+      console.log("Results:", results_Array);
       // Clean up session data
       // assessmentResults.delete(sessionId);
-      res.json(results_Array
-      );
+      const formattedResults = results_Array.evaluations.map((evaluation, index) => {
+        if (evaluation.is_correct) {
+          return {
+        status: "correct",
+        accuracy: evaluation.accuracy,
+        user_answer: evaluation.user_answer,
+        correct_answer: evaluation.correct_answer,
+          };
+        } else {
+            return {
+          status: "wrong",
+          accuracy: evaluation.accuracy,
+          user_answer: evaluation.user_answer,
+          correct_answer: evaluation.correct_answer,
+          question: questionsArray[index],
+          missing_points: evaluation.missing_points,
+            };
+        }
+      });
+
+      res.json({ evaluations: formattedResults, totalScore: results_Array.totalScore });
     } catch (error) {
       console.error("Error evaluating answers:", error);
       res.status(500).json({
