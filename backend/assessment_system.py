@@ -195,6 +195,7 @@ class AssessmentSystem:
             'is_correct': accuracy >= self.accuracy_threshold
         }
 
+    # def evaluate_answer(self, user_answer: str, correct_answer: str) -> Dict:
     def evaluate_answer(self, user_answer: str, correct_answer: str) -> Dict:
         """
         Evaluate a single user answer with advanced, flexible methods.

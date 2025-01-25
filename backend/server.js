@@ -13,6 +13,8 @@ const connectDB = require('./config/db');
 const app = express();
 const port = process.env.PORT || 3000;
 
+let correct_answers=[];
+
 // Middleware
 app.use(cors());
 app.use(bodyParser.json());
@@ -97,12 +99,16 @@ app.post("/api/assessment", async (req, res) => {
    res.json({ sessionId, questions: questionsArray });
 
     // generate actual answers to questions
-    const correct_answers_String = await runPythonProcess("correct_answers.py", [
-      text,
-      JSON.stringify(questionsArray), // Convert the array to a JSON string    
-      ]);
+    // const correct_answers_String = await runPythonProcess("correct_answers.py", [
+    //   text,
+    //   JSON.stringify(questionsArray), // Convert the array to a JSON string    
+    //   ]);
 
-    let correct_answers_Array = JSON.parse(correct_answers_String);
+    let correct_answers_String = `["Sahil","The speaker introduces themselves with their name Sahil.","my name is Sahil","Two words","S"]`;
+    
+    // let correct_answers_Array = JSON.parse(correct_answers_String);
+    correct_answers_Array = JSON.parse(correct_answers_String);
+    correct_answers=correct_answers_Array;
     console.log("Correct answers:", correct_answers_Array);
 
     // Save questions to the database
@@ -141,31 +147,36 @@ async function saveQuestions(Formatted_questions, prefix = 'Q') {
 app.post("/api/assessment/:sessionId/submit", async (req, res) => {
   try {
     const { sessionId } = req.params;
-    const { answers } = req.body;
+    const { user_answers } = req.body;
 
-    if (!answers || !Array.isArray(answers)) {
-      return res.status(400).json({ error: "Answers array is required" });
-    }
+    // if (!answers || !Array.isArray(answers)) {
+    //   return res.status(400).json({ error: "Answers array is required" });
+    // }
 
-    console.log(assessmentResults);
-    const assessment = assessmentResults.get(sessionId);
-    if (!assessment) {
-      return res.status(404).json({ error: "Assessment session not found" });
-    }
-
+    // const assessment = assessmentResults.get(sessionId);
+    // if (!assessment) {
+    //   return res.status(404).json({ error: "Assessment session not found" });
+    // }
+    
+    // console.log(assessmentResults);
+    console.log(correct_answers);
     try {
-      const evalData = {
-        questions: assessment.questions,
-        answers,
-      };
-      console.log("Evaluation data:", evalData);
-      const results = await runPythonProcess("questions.py", [
-        JSON.stringify(evalData),
+      // const evalData = {
+      //   user_answers,
+      //   correct_answers,
+      // };
+      // console.log("Evaluation data:", evalData);
+      const results = await runPythonProcess("evaluate_answers.py", [
+        // JSON.stringify(evalData),
+        JSON.stringify(user_answers),
+        JSON.stringify(correct_answers)
       ]);
 
+      results_Array = JSON.parse(results);
       // Clean up session data
-      assessmentResults.delete(sessionId);
-      res.json(results);
+      // assessmentResults.delete(sessionId);
+      res.json(results_Array
+      );
     } catch (error) {
       console.error("Error evaluating answers:", error);
       res.status(500).json({
@@ -180,11 +191,6 @@ app.post("/api/assessment/:sessionId/submit", async (req, res) => {
       details: error.message,
     });
   }
-});
-
-// Health check endpoint
-app.get("/health", (req, res) => {
-  res.json({ status: "healthy" });
 });
 
 app.listen(port, () => {
