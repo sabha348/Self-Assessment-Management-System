@@ -2,10 +2,15 @@ import os
 from dotenv import load_dotenv
 load_dotenv()
 import sys
+import json
 from typing import Dict, List
 from assessment_system import AssessmentSystem
 
-def correct_answer_handler(input_text: str, questions: List[str]) -> Dict:
+def json_encode(obj):
+    """Helper function to properly encode JSON with special characters"""
+    return json.dumps(obj, ensure_ascii=False, indent=None)
+
+def correct_answer_handler(input_text: str, questions: List[str]) -> List[str]:
 
     try:
         # Initialize the assessment system
@@ -27,18 +32,23 @@ def correct_answer_handler(input_text: str, questions: List[str]) -> Dict:
         return correct_answers
         
     except Exception as e:
+        print(f"An error occurred: {e}", file=sys.stderr)
         raise
 
 if __name__ == "__main__":
     try:
-        if len(sys.argv) < 2:
-            sys.exit(1)
-        else:
+        # if len(sys.argv) < 3:
+        #     print("Error: Required arguments missing. Usage: script.py <input_text> <questions_json>", file=sys.stderr)
+        #     sys.exit(1)
+        # else:
             # Handle correct answer generation
-            input_text = sys.argv[1]
-            questions = sys.argv[2]
-            results = correct_answer_handler(input_text, questions)
+        input_text = sys.argv[1] if len(sys.argv) > 1 else "hello my name is Sahil"
+        questions = json.loads(sys.argv[2]) if len(sys.argv) > 2 else ["What is your name?"]
+        results = correct_answer_handler(input_text, questions)
+        
+        print(json_encode(results))
         sys.exit(0)
 
     except Exception as e:
+        print(f"An error occurred: {e}", file=sys.stderr)
         sys.exit(1)

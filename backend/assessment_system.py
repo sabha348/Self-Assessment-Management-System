@@ -89,8 +89,7 @@ class AssessmentSystem:
             )
 
             generated_text = completion.choices[0].message.content
-            # print(generated_text)
-            # More robust question parsing
+            
             questions = [
                 q.strip()
                 for q in re.split(r'\n+', generated_text)
@@ -145,7 +144,6 @@ class AssessmentSystem:
                 print(f"Answer generation error: {e}")
                 correct_answers.append("Unable to generate answer")
 
-        print(correct_answers)
         return correct_answers
 
 
@@ -197,6 +195,7 @@ class AssessmentSystem:
             'is_correct': accuracy >= self.accuracy_threshold
         }
 
+    # def evaluate_answer(self, user_answer: str, correct_answer: str) -> Dict:
     def evaluate_answer(self, user_answer: str, correct_answer: str) -> Dict:
         """
         Evaluate a single user answer with advanced, flexible methods.
@@ -221,7 +220,7 @@ Evaluation Guidelines:
 
 Provide:
 1. Semantic Accuracy Percentage (0-100)
-2. Key Missing/Incorrect Points
+2. Key Missing Points
 3. Brief Comparative Analysis
 
 Response Format:
@@ -249,21 +248,39 @@ Analysis:detailed text"""
             )
 
             evaluation_text = completion.choices[0].message.content
+            # print(f"AI Evaluation: {evaluation_text}")
 
             # Extract AI-suggested accuracy
-            accuracy_match = re.search(r'Accuracy:(\d+)', evaluation_text)
+            accuracy_match = re.search(r'Accuracy.*?(\d+)%', evaluation_text)
             ai_accuracy = int(accuracy_match.group(1)) if accuracy_match else None
 
             # Extract missing points
-            missing_points_match = re.search(r'Missing Points:\[(.*?)\]', evaluation_text)
-            missing_points = [
-                point.strip()
-                for point in missing_points_match.group(1).split(',')
-                if point.strip()
-            ] if missing_points_match else []
+            missing_points_pattern = (
+                r'Missing Points:.*?\n(.*?)(?=\nAnalysis)|'  # Match "Missing Points" section before "Analysis"
+                r'Key Missing Points:.*?\n(.*?)(?=\n3\.)|'  # Match "Key Missing Points" section
+                r'Missing Points:.*?\n\[(.*?)\]|'            # Match "Missing Points" section with list format
+                r'Key Missing Points:.*?\n(?:\s*-\s.*?\n)+|'  # Match "Key Missing Points" section with bullet points
+                r'\*?\*?Key Missing Points:\*?\*?.*?\n((?:\s*-[^\n]+\n(?:\s+-[^\n]+\n)*)+)|'  # Match bold or normal Key Missing Points with nested bullets
+                r'\*?\*?Key Missing Points:\*?\*?.*?\n(?:\s*-\s.*?\n)+'  # Match Key Missing Points with bullet
+             )
+            missing_points_match = re.search(missing_points_pattern, evaluation_text, re.DOTALL)
+            missing_points = []
+            if missing_points_match:
+                missing_points_group = missing_points_match.group(1) or missing_points_match.group(2) or missing_points_match.group(3) or missing_points_match.group(4) or missing_points_match.group(5)
+                if missing_points_group:
+                    missing_points = [
+                        point.strip('- ').strip()
+                        for point in missing_points_group.split('\n')
+                        if point.strip()
+                    ]  
+            # missing_points = [
+            #     point.strip()
+            #     for point in missing_points_match.group(1).split(',')
+            #     if point.strip()
+            # ] if missing_points_match else []
 
         except Exception as e:
-            print(f"AI Evaluation error: {e}")
+            # print(f"AI Evaluation error: {e}")
             ai_accuracy = None
             missing_points = []
 

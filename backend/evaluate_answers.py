@@ -3,7 +3,6 @@ from dotenv import load_dotenv
 load_dotenv()
 import sys
 import json
-import logging
 from typing import Dict, List
 from assessment_system import AssessmentSystem
 
@@ -20,48 +19,7 @@ def json_encode(obj):
     """Helper function to properly encode JSON with special characters"""
     return json.dumps(obj, ensure_ascii=False, indent=None)
 
-# logger = logging.getLogger(__name__)
-
-def handle_assessment(input_text: str, num_questions: int = 5) -> Dict:
-    """
-    Handle the assessment process and return JSON-serializable results.
-    """
-    try:
-        # logger.debug(f"Starting assessment with text: {input_text[:100]}...")
-        
-        # Initialize the assessment system
-        api_key = os.getenv('HUGGINGFACE_API_KEY')  # Retrieve API key from environment variable
-        if not api_key:
-            raise ValueError("API key not found. Please set the 'HUGGINGFACE_API_KEY' environment variable.")
-        # logger.debug("Initializing AssessmentSystem")
-        
-        assessment = AssessmentSystem(
-            api_key=api_key,
-            accuracy_threshold=60,
-            evaluation_mode='lenient'
-        )
-
-        # Generate questions
-        # logger.debug("Generating questions")
-        questions = assessment.generate_questions(input_text="hello my name is Sahil", num_questions=5)
-        if not questions:
-            raise Exception("Failed to generate questions")
-
-        # # Generate correct answers
-        # logger.debug("Generating correct answers")
-        # correct_answers = assessment.generate_correct_answers(input_text, questions)
-
-        # logger.debug("Assessment completed successfully")
-
-        print("before return",questions)
-        return {
-            "questions": questions,
-            # "correctAnswers": correct_answers
-        }
-    except Exception as e:
-        # logger.error(f"Error in handle_assessment: {str(e)}", exc_info=True)
-        raise
-
+# def evaluate_answers(user_answers: List[str],correct_answers: List[str]) -> Dict:
 def evaluate_answers(answers_data: Dict) -> Dict:
     """
     Evaluate submitted answers and return results.
@@ -70,7 +28,7 @@ def evaluate_answers(answers_data: Dict) -> Dict:
         # logger.debug("Starting answer evaluation")
         api_key = os.getenv('HUGGINGFACE_API_KEY')  # Retrieve API key from environment variable
         if not api_key:
-            raise ValueError("API key not found. Please set the 'ASSESSMENT_API_KEY' environment variable.")        
+            raise ValueError("API key not found. Please set the 'HUGGINGFACE_API_KEY' environment variable.")        
         assessment = AssessmentSystem(
             
             api_key=api_key,
@@ -81,21 +39,43 @@ def evaluate_answers(answers_data: Dict) -> Dict:
         results = []
         total_score = 0
 
+        # # Convert JSON strings to arrays if needed
+        # if isinstance(user_answers, str):
+        #     user_answers = json.loads(user_answers)
+        # if isinstance(correct_answers, str):
+        #     correct_answers = json.loads(correct_answers)
+
+        # # Ensure both are lists/arrays
+        # if not isinstance(user_answers, list):
+        #     user_answers = [user_answers]
+        # if not isinstance(correct_answers, list):
+        #     correct_answers = [correct_answers]
+
         for i, (user_answer, correct_answer) in enumerate(zip(
             answers_data['answers'], 
-            answers_data['correctAnswers']
-        )):
+            answers_data['correct_answers']
+            )):
             # logger.debug(f"Evaluating answer {i+1}")
             result = assessment.evaluate_answer(user_answer, correct_answer)
             if result['is_correct']:
                 total_score += 1
             results.append(result)
 
+        # for i in range(len(user_answers)):
+        #     # logger.debug(f"Evaluating answer {i+1}")
+        #     user_answer = user_answers[i]
+        #     correct_answer = correct_answers[i]
+        #     result = assessment.evaluate_answer(user_answer, correct_answer)
+        #     if result['is_correct']:
+        #         total_score += 1
+        #     results.append(result)
+
         # logger.debug("Evaluation completed successfully")
+        # print(results)
         return {
             "evaluations": results,
             "totalScore": total_score,
-            "totalQuestions": len(answers_data['answers'])
+            # "totalQuestions": len(answers_data['answers'])
         }
     except Exception as e:
     #     logger.error(f"Error in evaluate_answers: {str(e)}", exc_info=True)
@@ -103,21 +83,28 @@ def evaluate_answers(answers_data: Dict) -> Dict:
 
 if __name__ == "__main__":
     try:
-        # logger.debug(f"Script started with arguments: {sys.argv}")
         
-        # if len(sys.argv) < 2:
-        #     print(json_encode({"error": "Missing required arguments"}))
-        #     sys.exit(1)
+        if len(sys.argv) < 2:
+            print(json_encode({"error": "Missing required arguments"}))
+            sys.exit(1)
 
         # if sys.argv[1].startswith('{'):
-        #     # Handle answer evaluation
-        #     answers_data = json.loads(sys.argv[1])
-        #     results = evaluate_answers(answers_data)
+        else:
+            # Handle answer evaluation
+            #pass {"answers":["yes","yes","yes","yes","yes"],"correct_answers":["Sahil","The speaker introduces themselves with their name Sahil.","my name is Sahil","Two words","S"]} from received argument in sys.argv[1] to evaluate_answers function 
+            data = json.loads(sys.argv[1])
+            answers_data = {
+                'answers': data["answers"],
+                'correct_answers': data["correct_answers"]
+            }
+            results = evaluate_answers(answers_data)
+            
         # else:
             # Handle initial assessment
-        input_text = "hello my name is Sahil"
-        num_questions = 5
-        results = handle_assessment(input_text, num_questions)
+        # print(sys.argv[1])
+        # user_answers = json.loads(sys.argv[1]) if len(sys.argv) > 1 else ["yes", "no"]
+        # correct_answers = json.loads(sys.argv[2]) if len(sys.argv) > 2 else ["yes", "no"]
+        # results = evaluate_answers(user_answers, correct_answers)
 
         # Ensure proper JSON encoding of the results
         print(json_encode(results))
