@@ -5,20 +5,31 @@ const bodyParser = require("body-parser");
 const mongoose = require("mongoose");
 const Question = require("./models/question");
 require('dotenv').config();
-const authRoutes = require("./routes/auth");
 const uri = process.env.MONGODB_URI;
 const userRoutes = require('./routes/userRouter');
 const connectDB = require('./config/db');
-
+const registerUser = require('./authentication/register');
+const loginUser = require('./authentication/login'); 
 const app = express();
 const port = process.env.PORT || 3000;
 
 // Middleware
-app.use(cors());
+
 app.use(bodyParser.json());
 
 connectDB();
 
+app.use(cors({
+  origin: '*', // Allow requests from any origin (less secure)
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
+
+
+// Middleware for parsing JSON
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
 // Helper function to run Python process
 function runPythonProcess(scriptName, args) {
@@ -206,6 +217,7 @@ app.listen(port, () => {
 //   });
 
 
-app.use('api/auth',authRoutes);
+app.use('/register',registerUser);
+app.use('/login',loginUser);
 
 app.use('/user',userRoutes);
