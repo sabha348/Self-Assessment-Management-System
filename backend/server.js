@@ -85,12 +85,12 @@ app.post("/api/assessment", async (req, res) => {
     // Generate a unique session ID
     const sessionId = Date.now().toString();
     
-    // let questionsString = await runPythonProcess("questions.py", [
-    //   text,
-    //   numQuestions.toString(),
-    // ]);
+    let questionsString = await runPythonProcess("questions.py", [
+      text,
+      numQuestions.toString(),
+    ]);
 
-   let questionsString = `["- What is the speaker's name?", "- What does the speaker introduce themselves with?", "- What are the last three words the speaker says?", "- How many words does the speaker use to introduce themselves?", "- What is the first letter of the speaker's name?"]`;
+  //  let questionsString = `["- What is the speaker's name?", "- What does the speaker introduce themselves with?", "- What are the last three words the speaker says?", "- How many words does the speaker use to introduce themselves?", "- What is the first letter of the speaker's name?"]`;
    // Parse the questions string into an array
    questionsArray = JSON.parse(questionsString);
     // Remove the '-' from each question
@@ -100,12 +100,12 @@ app.post("/api/assessment", async (req, res) => {
    res.json({ sessionId, questions: questionsArray });
 
     // generate actual answers to questions
-    // const correct_answers_String = await runPythonProcess("correct_answers.py", [
-    //   text,
-    //   JSON.stringify(questionsArray), // Convert the array to a JSON string    
-    //   ]);
+    const correct_answers_String = await runPythonProcess("correct_answers.py", [
+      text,
+      JSON.stringify(questionsArray), // Convert the array to a JSON string    
+      ]);
 
-    let correct_answers_String = `["Sahil","The speaker introduces themselves with their name Sahil.","my name is Sahil","Two words","S"]`;
+    // let correct_answers_String = `["Sahil","The speaker introduces themselves with their name Sahil.","my name is Sahil","Two words","S"]`;
     
     // let correct_answers_Array = JSON.parse(correct_answers_String);
     correct_answers_Array = JSON.parse(correct_answers_String);

@@ -256,17 +256,17 @@ Analysis:detailed text"""
 
             # Extract missing points
             missing_points_pattern = (
-                r'Key Missing Points:.*?\n(.*?)(?=\n3\.)|'  # Match "Key Missing Points" section
                 r'Missing Points:.*?\n(.*?)(?=\nAnalysis)|'  # Match "Missing Points" section before "Analysis"
+                r'Key Missing Points:.*?\n(.*?)(?=\n3\.)|'  # Match "Key Missing Points" section
                 r'Missing Points:.*?\n\[(.*?)\]|'            # Match "Missing Points" section with list format
-                r'Key Missing Points:.*?\n(?:\s*-\s.*?\n)+'  # Match "Key Missing Points" section with bullet points
+                r'Key Missing Points:.*?\n(?:\s*-\s.*?\n)+|'  # Match "Key Missing Points" section with bullet points
                 r'\*?\*?Key Missing Points:\*?\*?.*?\n((?:\s*-[^\n]+\n(?:\s+-[^\n]+\n)*)+)|'  # Match bold or normal Key Missing Points with nested bullets
                 r'\*?\*?Key Missing Points:\*?\*?.*?\n(?:\s*-\s.*?\n)+'  # Match Key Missing Points with bullet
              )
             missing_points_match = re.search(missing_points_pattern, evaluation_text, re.DOTALL)
             missing_points = []
             if missing_points_match:
-                missing_points_group = missing_points_match.group(1) or missing_points_match.group(2)
+                missing_points_group = missing_points_match.group(1) or missing_points_match.group(2) or missing_points_match.group(3) or missing_points_match.group(4) or missing_points_match.group(5)
                 if missing_points_group:
                     missing_points = [
                         point.strip('- ').strip()
@@ -280,7 +280,7 @@ Analysis:detailed text"""
             # ] if missing_points_match else []
 
         except Exception as e:
-            print(f"AI Evaluation error: {e}")
+            # print(f"AI Evaluation error: {e}")
             ai_accuracy = None
             missing_points = []
 

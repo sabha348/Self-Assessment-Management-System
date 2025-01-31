@@ -1,0 +1,8 @@
+// src/components/profile/UserProfile.jsx
+import React from 'react';
+
+const UserProfile = () => {
+  return <div>User Profile</div>;
+};
+
+export default UserProfile;
