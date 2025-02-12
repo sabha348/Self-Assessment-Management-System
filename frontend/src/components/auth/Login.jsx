@@ -10,15 +10,27 @@ const Login = () => {
   const { isLoading, error } = useSelector((state) => state.auth);
 
   const handleSubmit = async (e) => {
+    console.log('Form submission started');
     e.preventDefault();
     const formData = {
       email: e.target.email.value,
       password: e.target.password.value
     };
-
-    const resultAction = await dispatch(loginUser(formData));
-    if (loginUser.fulfilled.match(resultAction)) {
-      navigate('/dashboard');
+    
+    console.log('Submitting form data:', formData);
+    
+    try {
+      const resultAction = await dispatch(loginUser(formData));
+      console.log('Result action:', resultAction);
+      
+      if (loginUser.fulfilled.match(resultAction)) {
+        console.log('Login successful, navigating to dashboard');
+        navigate('/dashboard');
+      } else {
+        console.log('Login failed:', resultAction.error?.message);
+      }
+    } catch (err) {
+      console.error('Login error:', err);
     }
   };
 

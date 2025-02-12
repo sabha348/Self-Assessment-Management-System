@@ -1,13 +1,17 @@
 // src/services/authService.js
 import axios from 'axios';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
 export const authService = {
   login: async (credentials) => {
     try {
       const response = await axios.post(`${API_URL}/auth/login`, credentials);
-      return response.data;
+      // Store token if it exists
+      if (response.data.token) {
+        localStorage.setItem('token', response.data.token);
+      }
+      return response; // Return the whole response
     } catch (error) {
       throw error;
     }

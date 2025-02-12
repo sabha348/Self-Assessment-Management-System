@@ -3,11 +3,12 @@ import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Provider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
-import { store, persistor } from './redux/store';
+import { store, persistor } from './redux/store/store';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import './index.css';
+import './styles/index.css';
+import { ErrorBoundary } from 'react-error-boundary';
 
 // Import Route Components
 import Login from './components/auth/Login';
@@ -17,6 +18,7 @@ import PrivateRoute from './components/common/PrivateRoute';
 import QuestionGenerator from './components/questions/QuestionGenerator';
 import UserProfile from './components/profile/UserProfile';
 import NotFound from './pages/NotFound';
+import PdfViewer from './pages/PdfViewer';
 
 // MUI Theme Configuration
 const theme = createTheme({
@@ -30,60 +32,73 @@ const theme = createTheme({
   },
 });
 
+function ErrorFallback({ error }) {
+  return (
+    <div className="p-4">
+      <h2>Something went wrong:</h2>
+      <pre>{error.message}</pre>
+    </div>
+  );
+}
+
 function App() {
   return (
-    <Provider store={store}>
-      <PersistGate loading={null} persistor={persistor}>
-        <ThemeProvider theme={theme}>
-          <BrowserRouter>
-            <Routes>
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
-              
-              <Route 
-                path="/dashboard" 
-                element={
-                  <PrivateRoute>
-                    <Dashboard />
-                  </PrivateRoute>
-                } 
+    <ErrorBoundary FallbackComponent={ErrorFallback}>
+      <Provider store={store}>
+        <PersistGate loading={null} persistor={persistor}>
+          <ThemeProvider theme={theme}>
+            <BrowserRouter>
+              <Routes>
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
+                
+                <Route 
+                  path="/dashboard" 
+                  element={
+                    // <PrivateRoute>
+                      <Dashboard />
+                    // </PrivateRoute>
+                  } 
+                />
+                
+                <Route 
+                  path="/questions" 
+                  element={
+                    <PrivateRoute>
+                      <QuestionGenerator />
+                    </PrivateRoute>
+                  } 
+                />
+                
+                <Route 
+                  path="/profile" 
+                  element={
+                    <PrivateRoute>
+                      <UserProfile />
+                    </PrivateRoute>
+                  } 
+                />
+                
+                <Route path="/pdf-viewer" element={<PdfViewer />} />
+                
+                <Route path="*" element={<Dashboard />} />
+              </Routes>
+              <ToastContainer 
+                position="top-right"
+                autoClose={3000}
+                hideProgressBar={false}
+                newestOnTop={false}
+                closeOnClick
+                rtl={false}
+                pauseOnFocusLoss
+                draggable
+                pauseOnHover
               />
-              
-              <Route 
-                path="/questions" 
-                element={
-                  <PrivateRoute>
-                    <QuestionGenerator />
-                  </PrivateRoute>
-                } 
-              />
-              
-              <Route 
-                path="/profile" 
-                element={
-                  <PrivateRoute>
-                    <UserProfile />
-                  </PrivateRoute>
-                } 
-              />
-              
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-            <ToastContainer 
-              position="top-right"
-              autoClose={3000}
-              hideProgressBar={false}
-              newestOnTop={false}
-              closeOnClick
-              rtl={false}
-              pauseOnFocusLoss
-              draggable
-              pauseOnHover
-            />
-          </BrowserRouter>
-        </ThemeProvider>
-      </PersistGate>
-    </Provider>
+            </BrowserRouter>
+          </ThemeProvider>
+        </PersistGate>
+      </Provider>
+    </ErrorBoundary>
   );
 }
 

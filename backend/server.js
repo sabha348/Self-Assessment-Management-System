@@ -1,249 +1,53 @@
 const express = require("express");
-const { spawn } = require("child_process");
 const cors = require("cors");
 const bodyParser = require("body-parser");
-const mongoose = require("mongoose");
-const Question = require("./models/question");
-require('dotenv').config();
-const uri = process.env.MONGODB_URI;
-const userRoutes = require('./routes/userRouter');
 const connectDB = require('./config/db');
+const userRoutes = require('./routes/userRouter');
+const assessmentRoutes = require('./routes/assessmentRouter');
 const registerUser = require('./authentication/register');
 const loginUser = require('./authentication/login'); 
+const { upload, uploadFile } = require('./services/fileService');
+
 const app = express();
 const port = process.env.PORT || 3000;
 
-let correct_answers=[];
-let questionsArray = [];
-
-// Middleware
-
-app.use(bodyParser.json());
-
+// Connect to database
 connectDB();
 
+// Middleware
 app.use(cors({
-  origin: '*', // Allow requests from any origin (less secure)
+  origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
+app.use(bodyParser.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
+// Routes
+app.use('/api/assessment', assessmentRoutes);
+app.use('/api/auth/register', registerUser);
+app.post('/api/auth/login', loginUser);
+app.use('/user', userRoutes);
+app.post('/api/upload', upload.single('file'), uploadFile);
 
-// Middleware for parsing JSON
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ limit: '10mb', extended: true }));
-
-// Helper function to run Python process
-function runPythonProcess(scriptName, args) {
-  return new Promise((resolve, reject) => {
-    console.log(`Executing Python script: ${scriptName} with args:`, args);
-
-    const pythonProcess = spawn("python", [scriptName, ...args]);
-    let outputData = "";
-    let errorData = "";
-
-    // Set timeout for process
-    let timeout = 12000;
-    const timeoutId = setTimeout(() => {
-      pythonProcess.kill();
-      reject(new Error(`Process timed out after ${timeout/1000} seconds`));
-    }, timeout);
-
-    pythonProcess.stdout.on("data", (data) => {
-      outputData += data.toString();
-    });
-
-    pythonProcess.stderr.on("data", (data) => {
-      console.error("Python stderr:", data.toString());
-      errorData += data.toString();
-    });
-
-    pythonProcess.on("error", (error) => {
-      console.error("Failed to start Python process:", error);
-      clearTimeout(timeout);
-      reject(error);
-    });
-
-    pythonProcess.on("close", (code) => {
-      clearTimeout(timeout);
-      console.log(`Python process exited with code ${code}`);
-
-      if (code !== 0) {
-        reject(new Error(`Process exited with code ${code}: ${errorData}`));
-        return;
-      }
-
-      try {
-        resolve(outputData);
-      } catch (e) {
-        console.error("Output that failed to parse:", outputData);
-        reject(new Error(`Failed to parse Python output or did not receive data on stdout: ${e.message}`));
-      }
-    });
-  });
-}
-
-// Endpoint to initiate assessment
-app.post("/api/assessment", async (req, res) => {
-  try {
-    const { text, numQuestions = 5, type = 'General', topic = 'Fruit' } = req.body;
-
-    if (!text) {
-      return res.status(400).json({ error: "Input text is required" });
-    }
-
-    // Generate a unique session ID
-    const sessionId = Date.now().toString();
-    
-    let questionsString = await runPythonProcess("questions.py", [
-      text,
-      numQuestions.toString(),
-    ]);
-
-  //  let questionsString = `["- What is the speaker's name?", "- What does the speaker introduce themselves with?", "- What are the last three words the speaker says?", "- How many words does the speaker use to introduce themselves?", "- What is the first letter of the speaker's name?"]`;
-   // Parse the questions string into an array
-   questionsArray = JSON.parse(questionsString);
-    // Remove the '-' from each question
-   questionsArray = questionsArray.map(question => question.replace(/^-\s*/, ''));
-
-    // Send only questions to client
-   res.json({ sessionId, questions: questionsArray });
-
-    // generate actual answers to questions
-    const correct_answers_String = await runPythonProcess("correct_answers.py", [
-      text,
-      JSON.stringify(questionsArray), // Convert the array to a JSON string    
-      ]);
-
-    // let correct_answers_String = `["Sahil","The speaker introduces themselves with their name Sahil.","my name is Sahil","Two words","S"]`;
-    
-    // let correct_answers_Array = JSON.parse(correct_answers_String);
-    correct_answers_Array = JSON.parse(correct_answers_String);
-    correct_answers=correct_answers_Array;
-    console.log("Correct answers:", correct_answers_Array);
-
-    // Save questions to the database
-    // await saveQuestions(Formatted_questions, 'Q');
-  }
-  catch (error) {
-    console.error("Server error:", error);
-    // res.status(500).json({
-    //   error: "Server error",
-    //   details: error.message,
-    // });
-  }
+// Test route
+app.get('/api/test', (req, res) => {
+  res.json({ message: 'Server is running!' });
 });
 
-// Function to save questions to the database
-async function saveQuestions(Formatted_questions, prefix = 'Q') {
-  try {
-    // Iterate over the array and save each question 
-    for (let index = 0; index < Formatted_questions.length; index++) {
-      const q = Formatted_questions[index];
-      const newQuestion = new Question({
-        qid: `${prefix}${index + 1}`,
-        type: 'General',
-        topic: 'Fruit',
-        question: q
-      });
-      await newQuestion.save();
-    }
-  } catch (err) {
-    console.log(err);
-    throw new Error(`Failed to save generated questions: ${err.message}`);
-  }
-}
-
-// Endpoint to submit answers
-app.post("/api/assessment/:sessionId/submit", async (req, res) => {
-  try {
-    const { sessionId } = req.params;
-    const { answers } = req.body;
-
-    if (!answers || !Array.isArray(answers)) {
-      return res.status(400).json({ error: "Answers array is required" });
-    }
-
-    // const assessment = assessmentResults.get(sessionId);
-    // if (!assessment) {
-    //   return res.status(404).json({ error: "Assessment session not found" });
-    // }
-    
-    // console.log(assessmentResults);
-    // console.log(correct_answers);
-    try {
-      const evalData = {
-        answers,
-        correct_answers,
-      };
-      // console.log("Evaluation data:", evalData);
-      const results = await runPythonProcess("evaluate_answers.py", [
-        JSON.stringify(evalData),
-        // JSON.stringify(user_answers),
-        // JSON.stringify(correct_answers)
-      ]);
-
-      results_Array = JSON.parse(results);
-      console.log("Results:", results_Array);
-      // Clean up session data
-      // assessmentResults.delete(sessionId);
-      const formattedResults = results_Array.evaluations.map((evaluation, index) => {
-        if (evaluation.is_correct) {
-          return {
-        status: "correct",
-        accuracy: evaluation.accuracy,
-        user_answer: evaluation.user_answer,
-        correct_answer: evaluation.correct_answer,
-          };
-        } else {
-            return {
-          status: "wrong",
-          accuracy: evaluation.accuracy,
-          user_answer: evaluation.user_answer,
-          correct_answer: evaluation.correct_answer,
-          question: questionsArray[index],
-          missing_points: evaluation.missing_points,
-            };
-        }
-      });
-
-      res.json({ evaluations: formattedResults, totalScore: results_Array.totalScore });
-    } catch (error) {
-      console.error("Error evaluating answers:", error);
-      res.status(500).json({
-        error: "Evaluation process failed",
-        details: error.message,
-      });
-    }
-  } catch (error) {
-    console.error("Server error:", error);
-    res.status(500).json({
-      error: "Server error",
-      details: error.message,
-    });
-  }
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('Server error:', err);
+  
+  // Send a formatted error response
+  res.status(err.status || 500).json({
+    error: err.message || 'An unexpected error occurred',
+    details: process.env.NODE_ENV === 'development' ? err.stack : undefined
+  });
 });
 
 app.listen(port, () => {
   console.log(`Assessment server running on port ${port}`);
 });
-
-// mongoose
-//   .connect(
-//     uri
-//   )
-//   .then(() => {
-//     app.listen(5000, () => {
-//       console.log("Database connected and server running on port 5000");
-//     });
-//   })
-//   .catch((err) => {
-//     console.log(err);
-//   });
-
-
-app.use('/register',registerUser);
-app.use('/login',loginUser);
-
-app.use('/user',userRoutes);

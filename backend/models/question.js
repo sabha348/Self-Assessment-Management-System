@@ -6,9 +6,9 @@ const questionSchema = new mongoose.Schema({
     difficulty: { type: String, enum: ['easy', 'medium', 'hard'], required: true },
     options: [{ type: String }], // Only for multiple-choice questions
     correctAnswer: { type: String },
+    concept: { type: String, required: true }, // New field to store the concept
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     createdAt: { type: Date, default: Date.now },
   });
   
   module.exports = mongoose.model('Question', questionSchema);
-  

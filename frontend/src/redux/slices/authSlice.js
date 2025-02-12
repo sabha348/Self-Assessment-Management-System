@@ -8,9 +8,14 @@ export const loginUser = createAsyncThunk(
   async (credentials, { rejectWithValue }) => {
     try {
       const response = await authService.login(credentials);
-      return response.data;
+      return {
+        token: response.data.token,
+        user: response.data.user || { email: credentials.email }
+      };
     } catch (error) {
-      return rejectWithValue(error.response.data);
+      return rejectWithValue(
+        error.response?.data?.message || 'An error occurred during login'
+      );
     }
   }
 );
