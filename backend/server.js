@@ -3,10 +3,11 @@ const cors = require("cors");
 const bodyParser = require("body-parser");
 const connectDB = require('./config/db');
 const userRoutes = require('./routes/userRouter');
+const fileRoutes = require('./routes/fileRoutes');
 const assessmentRoutes = require('./routes/assessmentRouter');
 const registerUser = require('./authentication/register');
 const loginUser = require('./authentication/login'); 
-const { upload, uploadFile } = require('./services/fileService');
+const { upload, uploadFile, getFiles } = require('./services/fileService');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -30,7 +31,7 @@ app.use('/api/assessment', assessmentRoutes);
 app.use('/api/auth/register', registerUser);
 app.post('/api/auth/login', loginUser);
 app.use('/user', userRoutes);
-app.post('/api/upload', upload.single('file'), uploadFile);
+app.use('/api/files', fileRoutes);
 
 // Test route
 app.get('/api/test', (req, res) => {

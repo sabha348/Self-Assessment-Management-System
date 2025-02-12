@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Book, Brain, Calculator, Layers, PenTool, Folder, Plus, Home, CreditCard, FolderArchive, FolderCheck, Clock, Calendar } from 'lucide-react';
+import { Book, Brain, Calculator, Layers, PenTool, Folder, Plus, Home, CreditCard, FolderArchive, FolderCheck, Clock, Calendar, CalendarCheck } from 'lucide-react';
 import { uploadFile } from '../services/fileService';
 import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
@@ -85,14 +85,16 @@ const Dashboard = () => {
         
         {/* Folder Icon with Tooltip */}
         <div className="relative group">
-          <div className="p-2 rounded-lg hover:bg-gray-100 cursor-pointer">
-            <Folder className="w-6 h-6 text-gray-600" />
+          <div className="p-2 rounded-lg hover:bg-gray-100 cursor-pointer"
+              onClick={() => navigate('/timetable')}
+          >
+            <CalendarCheck className="w-6 h-6 text-gray-600" />
           </div>
 
           {/* Tooltip */}
           <div className="absolute left-full ml-2 hidden group-hover:flex items-center">
             <div className="bg-black text-white text-sm py-1 px-2 rounded whitespace-nowrap">
-              My folders
+              My Timetable
             </div>
             {/* Arrow */}
             <div className="absolute left-0 transform -translate-x-1 w-2 h-2 bg-black rotate-45"></div>
@@ -131,9 +133,11 @@ const Dashboard = () => {
         <div className="mb-8">
           <h2 className="text-xl font-semibold mb-4">Studying</h2>
           <div className="grid grid-cols-3 gap-4">
-            <div className="p-6 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow">
+            <div className="p-6 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow"
+              onClick={() => navigate('/files')}
+            >
               <Book className="w-6 h-6 mb-3 text-gray-600" />
-              <h3 className="font-medium">Study guide</h3>
+              <h3 className="font-medium">Study</h3>
               <p className="text-sm text-gray-500">Learn swiftly</p>
             </div>
             <div className="p-6 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow">

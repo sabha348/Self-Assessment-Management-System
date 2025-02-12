@@ -19,6 +19,8 @@ import QuestionGenerator from './components/questions/QuestionGenerator';
 import UserProfile from './components/profile/UserProfile';
 import NotFound from './pages/NotFound';
 import PdfViewer from './pages/PdfViewer';
+import FilesList from './pages/FilesList';
+import Timetable from './pages/Timetable';
 
 // MUI Theme Configuration
 const theme = createTheme({
@@ -61,6 +63,9 @@ function App() {
                   } 
                 />
                 
+                <Route path="/files" element={<FilesList />} />
+                <Route path="/timetable" element={<Timetable />} />
+
                 <Route 
                   path="/questions" 
                   element={

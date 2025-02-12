@@ -62,6 +62,7 @@ def correct_answer_handler(input_text: str, questions: Union[str, List[str]]) ->
 
         # Get API key
         api_key = os.getenv('HUGGINGFACE_API_KEY')
+        # api_key = os.getenv('GOOGLE_API_KEY')
         if not api_key:
             raise ValueError("API key not found in environment variables")
 

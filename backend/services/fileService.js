@@ -34,7 +34,46 @@ const uploadFile = async (req, res) => {
   }
 };
 
+const getFiles = async (req, res) => {
+  try {
+    const files = await Document.find({})
+    .select('-content')  // Exclude the content field
+    .sort({ createdAt: -1 }); // Sort by newest first
+      
+    res.status(200).json(files);
+  } catch (error) {
+    console.error('Error fetching files:', error);
+    res.status(500).json({ error: 'Failed to fetch files' });
+  }
+};
+
+const getFileById = async (req, res) => {
+  try {
+    const file = await Document.findById(req.params.id);
+    if (!file) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+    res.json(file);
+  } catch (error) {
+    res.status(500).json({ error: 'Error fetching file' });
+  }
+};
+
+const deleteFile = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await Document.findByIdAndDelete(id);
+    res.status(200).json({ message: 'File deleted successfully' });
+  } catch (error) {
+    console.error('Delete error:', error);
+    res.status(500).json({ error: 'Failed to delete file' });
+  }
+};
+
 module.exports = {
   upload,
-  uploadFile
+  uploadFile,
+  getFiles,
+  getFileById,
+  deleteFile
 };
