@@ -2,37 +2,53 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const User = require('../models/Users');
 
-// login function
-
-const loginUser = async (req,res) => {
+const loginUser = async (req, res) => {
     try {
-        const {email, password } = req.body;
+        const { email, password } = req.body;
 
-        //check if user exist in database 
+        // Check if user exists
         const user = await User.findOne({ email });
-        if(!user) {
-            return res.status(400).json({ message : 'Invalid Email or Password'}); 
+        if (!user) {
+            return res.status(400).json({ message: 'Invalid credentials' });
         }
 
-        // comapre the entered password with hashed password stored in the database 
-        const isMatch = await bcrypt.compare(password,user.password);
-        if(!isMatch) {
-            return res.status(400).json({ message : 'Invalid Email or Password'});
+        // Compare passwords
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) {
+            return res.status(400).json({ message: 'Invalid credentials' });
         }
 
-        //Generate  a JWT token with the user's ID and role
+        // Generate JWT token
         const token = jwt.sign(
-            {userId:user._id,role: user.role},
-            process.env.JWT_SECRET, // use the secret key from .env
-            { expiresIn : '2h'} // Token will expire in 2 hour
+            { userId: user._id, role: user.role, membership: user.membership },
+            process.env.JWT_SECRET,
+            { expiresIn: '2h' }
         );
 
-        //send the token and a sucess message to the client 
-        res.status(200).json({ token, message: 'Login successful'});
+        // Send token via HTTP-only cookie (optional)
+        res.cookie('token', token, {
+            httpOnly: true, // Prevents JavaScript access
+            secure: process.env.NODE_ENV === 'production', // Only secure in production
+            sameSite: 'Strict',
+            maxAge: 2 * 60 * 60 * 1000 // 2 hours
+        });
+
+        // Send response
+        res.status(200).json({
+            message: 'Login successful',
+            token, // Only if you want token in response
+            user: {
+                id: user._id,
+                name: user.name,
+                email: user.email,
+                role: user.role,
+                membership: user.membership,
+            }
+        });
 
     } catch (error) {
-        console.error('Login error: ',error);
-        res.status(500).json({ message: 'Server error'});
+        console.error('Login error:', error);
+        res.status(500).json({ message: 'Internal server error' });
     }
 };
 

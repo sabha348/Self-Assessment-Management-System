@@ -17,9 +17,10 @@ const uploadFile = async (req, res) => {
       title: req.file.originalname,
       content: req.file.buffer.toString('base64'), // Store file as base64
       fileType: 'PDF',
-      // uploadedBy: req.user._id  // Uncomment when auth is implemented
+      uploadedBy: req.user.userId // Uncomment when auth is implemented
     });
 
+    
     await newDocument.save();
     
     res.status(200).json({
@@ -36,7 +37,7 @@ const uploadFile = async (req, res) => {
 
 const getFiles = async (req, res) => {
   try {
-    const files = await Document.find({})
+    const files = await Document.find({ uploadedBy: req.user.userId})
     .select('-content')  // Exclude the content field
     .sort({ createdAt: -1 }); // Sort by newest first
       

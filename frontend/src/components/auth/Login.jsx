@@ -1,77 +1,75 @@
-// src/components/auth/Login.jsx
-import React from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
-import { loginUser } from '../../redux/slices/authSlice';
+import React, { useState } from 'react';
+import { authService } from '../../services/authService';
+import { useNavigate, Link } from 'react-router-dom';
 
 const Login = () => {
-  const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { isLoading, error } = useSelector((state) => state.auth);
+  const [credentials, setCredentials] = useState({
+    email: '',
+    password: '',
+  });
+
+  const handleChange = (e) => {
+    setCredentials({ ...credentials, [e.target.name]: e.target.value });
+  };
 
   const handleSubmit = async (e) => {
-    console.log('Form submission started');
     e.preventDefault();
-    const formData = {
-      email: e.target.email.value,
-      password: e.target.password.value
-    };
-    
-    console.log('Submitting form data:', formData);
-    
     try {
-      const resultAction = await dispatch(loginUser(formData));
-      console.log('Result action:', resultAction);
-      
-      if (loginUser.fulfilled.match(resultAction)) {
-        console.log('Login successful, navigating to dashboard');
-        navigate('/dashboard');
-      } else {
-        console.log('Login failed:', resultAction.error?.message);
-      }
-    } catch (err) {
-      console.error('Login error:', err);
+      await authService.login(credentials);
+      alert('Login successful!');
+      navigate('/dashboard'); // Redirect after login
+    } catch (error) {
+      alert('Invalid credentials. Please try again.');
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-lg shadow">
-        <h2 className="text-3xl font-bold text-center">Login</h2>
-        {error && <div className="text-red-500 text-center">{error}</div>}
-        <form onSubmit={handleSubmit} className="mt-8 space-y-6">
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-              Email
-            </label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              required
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
-            />
-          </div>
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-              Password
-            </label>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              required
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-          >
-            {isLoading ? 'Loading...' : 'Sign In'}
-          </button>
-        </form>
+    <div className="flex justify-center items-center h-screen bg-white">
+      <div className="w-full max-w-4xl bg-gray-100 p-8 rounded-lg shadow-lg flex">
+        {/* Left Section */}
+        <div className="w-1/2 p-6">
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">Welcome Back to the Self-Assessment Hub</h2>
+          <p className="text-gray-700 mb-6">
+            Continue your learning journey with AI-powered quizzes, performance tracking, and smart study scheduling.
+          </p>
+          <p className="text-gray-600">Log in to access your personalized study experience.</p>
+        </div>
+
+        {/* Right Section - Login Form */}
+        <div className="w-1/2 p-6 bg-white rounded-lg shadow-md">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Login</h2>
+          <form onSubmit={handleSubmit}>
+            <div className="mb-4">
+              <label className="block text-gray-700">Email</label>
+              <input
+                type="email"
+                name="email"
+                className="w-full p-2 border rounded-lg"
+                placeholder="Enter your email"
+                onChange={handleChange}
+                required
+              />
+            </div>
+            <div className="mb-4">
+              <label className="block text-gray-700">Password</label>
+              <input
+                type="password"
+                name="password"
+                className="w-full p-2 border rounded-lg"
+                placeholder="Enter your password"
+                onChange={handleChange}
+                required
+              />
+            </div>
+            <button type="submit" className="w-full bg-black text-white py-2 rounded-lg">
+              Login
+            </button>
+          </form>
+          <p className="text-center text-gray-700 mt-4">
+            New user? <Link to="/register" className="text-blue-600">Sign Up</Link>
+          </p>
+        </div>
       </div>
     </div>
   );

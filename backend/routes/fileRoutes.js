@@ -1,11 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const { getFiles,getFileById, uploadFile, deleteFile } = require('../services/fileService');
-const { upload } = require('../services/fileService');
+const { getFiles, getFileById, uploadFile, deleteFile, upload } = require('../services/fileService');
+const authenticateToken = require('../middleware/authenticate');
 
-router.post('/upload', upload.single('file'), uploadFile);
-router.get('/', getFiles);
-router.get('/:id', getFileById);
-router.delete('/:id', deleteFile);
+
+// Protect file upload and deletion routes
+router.post('/upload', authenticateToken, upload.single('file'), uploadFile);
+router.get('/', authenticateToken, getFiles);
+router.get('/:id', authenticateToken, getFileById);
+router.delete('/:id', authenticateToken, deleteFile);
 
 module.exports = router;

@@ -29,7 +29,7 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 // Routes
 app.use('/api/assessment', assessmentRoutes);
 app.use('/api/auth/register', registerUser);
-app.post('/api/auth/login', loginUser);
+app.use('/api/auth/login', loginUser);
 app.use('/user', userRoutes);
 app.use('/api/files', fileRoutes);
 
