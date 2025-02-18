@@ -1,14 +1,15 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
 const questionSchema = new mongoose.Schema({
-    content: { type: String, required: true },
-    type: { type: String, enum: ['multiple-choice', 'fill-in-the-blank', 'open-ended'], required: true },
-    difficulty: { type: String, enum: ['easy', 'medium', 'hard'], required: true },
-    options: [{ type: String }], // Only for multiple-choice questions
-    correctAnswer: { type: String },
-    concept: { type: String, required: true }, // New field to store the concept
-    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    createdAt: { type: Date, default: Date.now },
-  });
-  
-  module.exports = mongoose.model('Question', questionSchema);
+  type: { type: String },
+  quizeRef: { type: mongoose.Schema.Types.ObjectId, ref: "Quiz",required: true},
+  questionId: {type:String, required: true, unique: true }, // create Qusestion id for each questions
+  content: { type: String, required: true }, // The question text
+  options: [{ type: String }], // Only applicable for multiple-choice questions (4 options)
+  correctAnswer: { type: String, required: true }, // Stores the correct answer
+  userAnswer: { type: String }, // Stores the user's submitted answer
+  accuracy: { type: Number, min: 0, max: 100 }, // Accuracy percentage (0-100)
+  missingPoint: { type: String }, // Explanation of missing points in user's answer
+});
+
+module.exports = mongoose.model("Question", questionSchema);

@@ -1,9 +1,12 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState,useEffect } from 'react';
 import { Book, Brain, Calculator, Layers, PenTool, Folder, Plus, Home, CreditCard, FolderArchive, FolderCheck, Clock, Calendar, CalendarCheck } from 'lucide-react';
 import { uploadFile } from '../services/fileService';
 import { toast } from 'react-toastify';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate  } from 'react-router-dom';
 import Logout  from '../components/auth/Logout'; //imported the logout 
+
+
+
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -14,6 +17,14 @@ const Dashboard = () => {
   const handlePlusClick = () => {
     fileInputRef.current.click();
   };
+
+
+  const [token, setToken] = useState(localStorage.getItem('token'));
+  useEffect(() => {
+      if (!token) {
+          navigate('/login'); // Redirect to login if token is not found
+      }
+  }, [token, navigate]);
 
   const handleFileChange = async (event) => {
     const file = event.target.files[0];
