@@ -34,8 +34,8 @@ def evaluate_answers(answers_data: Dict) -> Dict:
     Evaluate submitted answers and return results.
     """
     try:
-        # api_key = os.getenv('HUGGINGFACE_API_KEY')
-        api_key = os.getenv('GOOGLE_API_KEY')
+        api_key = os.getenv('HUGGINGFACE_API_KEY')
+        # api_key = os.getenv('GOOGLE_API_KEY')
         if not api_key:
             raise ValueError("API key not found. Please set the 'HUGGINGFACE_API_KEY' environment variable.")        
 

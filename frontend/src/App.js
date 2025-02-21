@@ -60,7 +60,7 @@ function App() {
                   element={
                     // <PrivateRoute>
                       <Dashboard />
-                    // </PrivateRoute>
+                    //  </PrivateRoute>
                   } 
                 />
                 
@@ -87,7 +87,7 @@ function App() {
                 
                 <Route path="/pdf-viewer" element={<PdfViewer />} />
                 
-                <Route path="*" element={<Dashboard />} />
+                <Route path="*" element={<Login/>} />
               </Routes>
               <ToastContainer 
                 position="top-right"

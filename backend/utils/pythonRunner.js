@@ -18,54 +18,40 @@ function sanitizeArgs(args) {
   });
 }
 
-function runPythonProcess(scriptName, args) {
+function runPythonProcess(scriptPath, args) {
   return new Promise((resolve, reject) => {
-    // Clean and prepare arguments
-    const sanitizedArgs = sanitizeArgs(args);
-    
-    console.log('Running Python script:', scriptName);
-    console.log('Raw arguments:', args);
-    console.log('Sanitized arguments:', sanitizedArgs);
+    const pythonProcess = spawn('python', [scriptPath, ...args]);
+    let dataString = '';
+    let errorString = '';
 
-    const pythonProcess = spawn("python", [scriptName, ...sanitizedArgs], {
-      env: {
-        ...process.env,
-        PYTHONIOENCODING: 'utf-8'
-      }
+    pythonProcess.stdout.on('data', (data) => {
+      dataString += data.toString();
     });
 
-    let outputData = "";
-    let errorData = "";
-
-    pythonProcess.stdout.on("data", (data) => {
-      outputData += data.toString('utf-8');
+    pythonProcess.stderr.on('data', (data) => {
+      errorString += data.toString();
     });
 
-    pythonProcess.stderr.on("data", (data) => {
-      errorData += data.toString('utf-8');
-      console.error('Python stderr:', data.toString('utf-8'));
-    });
-
-    pythonProcess.on("close", (code) => {
+    pythonProcess.on('close', (code) => {
       if (code !== 0) {
-        reject(new Error(`Process failed with code ${code}: ${errorData}`));
+        reject(new Error(`Process failed with code ${code}: ${errorString}`));
         return;
       }
 
       try {
-        // Handle empty output
-        const cleanOutput = outputData.trim();
-        if (!cleanOutput) {
-          reject(new Error('No output from Python script'));
-          return;
-        }
+        // Clean the output string
+        const cleanedData = dataString
+          .replace(/[\n\r]/g, '') // Remove newlines
+          .replace(/^[\s\uFEFF\xA0]+|[\s\uFEFF\xA0]+$/g, '') // Remove BOM and whitespace
+          .replace(/\s+/g, ' '); // Replace multiple spaces with single space
 
-        // Parse JSON output
-        const result = JSON.parse(cleanOutput);
-        resolve(result);
-      } catch (e) {
-        console.error('Failed to parse Python output:', outputData);
-        reject(new Error(`Invalid JSON output from Python: ${e.message}`));
+        // Parse the cleaned JSON
+        const parsedData = JSON.parse(cleanedData);
+        resolve(parsedData);
+      } catch (error) {
+        console.error('Raw output:', dataString);
+        console.error('Parsing error:', error);
+        reject(new Error(`Failed to parse Python output: ${error.message}`));
       }
     });
   });

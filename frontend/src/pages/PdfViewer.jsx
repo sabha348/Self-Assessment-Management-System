@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { toast, Toaster } from 'react-hot-toast';
 import { Worker, Viewer } from '@react-pdf-viewer/core';
 import { defaultLayoutPlugin } from '@react-pdf-viewer/default-layout';
 import { thumbnailPlugin } from '@react-pdf-viewer/thumbnail';
+import { jwtDecode } from 'jwt-decode';
 
 // Import styles
 import '@react-pdf-viewer/core/lib/styles/index.css';
@@ -13,8 +14,11 @@ import '@react-pdf-viewer/thumbnail/lib/styles/index.css';
 
 const PdfViewer = () => {
   const location = useLocation();
+  const token = localStorage.getItem('token');
+  const decodedToken = token ? jwtDecode(token) : null;
+  const userId = decodedToken?.userId; // or .id or ._id depending on your token
   const navigate = useNavigate();
-  const { pdfData, title } = location.state || {};
+  const { pdfData, title, userId: locationUserId} = location.state || {};
   const [selectedText, setSelectedText] = useState('');
   const [buttonPosition, setButtonPosition] = useState({ x: 0, y: 0 });
   const [showButton, setShowButton] = useState(false);
@@ -25,13 +29,16 @@ const PdfViewer = () => {
   const [showQuestions, setShowQuestions] = useState(false);
   const [selectedQuestion, setSelectedQuestion] = useState(null);
   const [answers, setAnswers] = useState({});
-  const [sessionId, setSessionId] = useState(null);
+  const [quizId, setQuizId] = useState(null);
   const [evaluationResults, setEvaluationResults] = useState(null);
   const [showResults, setShowResults] = useState(false);
   const [lastReadPosition, setLastReadPosition] = useState(0);
   const [autoSubmissionTimer, setAutoSubmissionTimer] = useState(null);
   const [isTimerPaused, setIsTimerPaused] = useState(false);
   const [lastSubmissionTime, setLastSubmissionTime] = useState(Date.now());
+  const [startTime, setStartTime] = useState(Date.now());
+  const [savedMarkers, setSavedMarkers] = useState([]);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Constants for text limits
   const TEXT_LIMITS = {
@@ -103,20 +110,26 @@ const PdfViewer = () => {
     };
   }, []);
 
+  useEffect(() => {
+    // Set start time when component mounts
+    setStartTime(Date.now());
+  }, []);
+
   const handleProcessText = async () => {
-    console.log('Selected text:', selectedText); // Add this line to log the selected text
     try {
       const loadingToast = toast.loading('Generating questions...');
       
       const response = await axios.post('http://localhost:8000/api/assessment', {
         text: selectedText,
         numQuestions: 5,
+        userId: userId,
+        topic: 'General',
+        subject: 'Knowledge',
         type: 'General',
-        topic: 'Fruit'
       });
       
       setQuestions(response.data.questions);
-      setSessionId(response.data.sessionId);
+      setQuizId(response.data.quizId);
       setShowQuestions(true);
       toast.dismiss(loadingToast);
       
@@ -199,7 +212,7 @@ const PdfViewer = () => {
   };
 
   // Modified auto-submission handler
-  const handleAutoSubmission = async () => {
+  const handleAutoSubmission = useCallback(async () => {
     const currentTime = Date.now();
     const timeSinceLastSubmission = currentTime - lastSubmissionTime;
     const FIVE_MINUTES = 0.5 * 60 * 1000;
@@ -224,6 +237,8 @@ const PdfViewer = () => {
         const response = await axios.post('http://localhost:8000/api/assessment', {
           text: newText,
           numQuestions: 5,
+          userId: userId,
+          subject: 'Knowledge',
           type: 'General',
           topic: 'Fruit'
         });
@@ -234,7 +249,7 @@ const PdfViewer = () => {
         
         setLastReadPosition(lastReadPosition + newText.length);
         setQuestions(response.data.questions);
-        setSessionId(response.data.sessionId);
+        setQuizId(response.data.quizId);
         setShowQuestions(true);
         setIsTimerPaused(true);
         
@@ -264,7 +279,7 @@ const PdfViewer = () => {
         maxAllowed: TEXT_LIMITS.MAX_CHARS
       });
     }
-  };
+  }, [lastReadPosition, userId]);
 
   // Setup auto-submission timer with pause functionality
   useEffect(() => {
@@ -284,7 +299,7 @@ const PdfViewer = () => {
         }
       };
     }
-  }, [isTimerPaused, lastReadPosition]);
+  }, [isTimerPaused, handleAutoSubmission]);
 
   // Modified scroll handler
   useEffect(() => {
@@ -300,7 +315,7 @@ const PdfViewer = () => {
 
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
-  }, [isTimerPaused, autoSubmissionTimer]);
+  }, [isTimerPaused, autoSubmissionTimer, userId]);
 
   // Resume timer when questions are closed
   const handleCloseQuestions = () => {
@@ -310,11 +325,33 @@ const PdfViewer = () => {
 
   // Modified submit handler
   const handleSubmitAnswers = async () => {
+    if (!quizId || !userId) {
+      toast.error("Missing quiz ID or user ID. Please try again.");
+      return;
+    }
+
     const toastId = toast.loading("Submitting answers...");
+
     try {
-      const response = await axios.post(`http://localhost:8000/api/assessment/${sessionId}/submit`, {
-        answers: answers
+
+      // Calculate time taken in seconds
+      const timeTaken = Math.floor((Date.now() - startTime) / 1000);
+      
+      // Convert answers object to use questionId keys
+      const formattedAnswers = {};
+      questions.forEach((question, index) => {
+        if (answers[index]) {
+          formattedAnswers[index] = answers[index];
+        }
       });
+      console.log(formattedAnswers);
+
+      const response = await axios.post(`http://localhost:8000/api/assessment/${quizId}/submit`, {
+        answers: formattedAnswers,
+        userId: userId,
+        timeTaken: timeTaken,
+      });
+
       toast.dismiss(toastId);
       setEvaluationResults(response.data);
       setShowQuestions(false);
@@ -334,7 +371,72 @@ const PdfViewer = () => {
     setAnswers({});
     setSelectedQuestion(null);
     setIsTimerPaused(false);  // Resume timer
+    // Reset start time for next assessment
+    setStartTime(Date.now());
   };
+
+  const MarkerButton = ({ marker, onClick }) => (
+    <button
+      className="absolute right-0 w-8 h-8 bg-blue-500 rounded-full text-white hover:bg-blue-600 
+                 transform transition-transform hover:scale-110 flex items-center justify-center
+                 shadow-lg z-50"
+      style={{ top: `${marker.position}px` }}
+      onClick={() => onClick(marker)}
+      title={`Result from ${marker.timestamp}`}
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+      </svg>
+    </button>
+  );
+
+  // Save markers to localStorage when they change
+  useEffect(() => {
+    if (savedMarkers.length > 0) {
+      localStorage.setItem(`pdf-markers-${pdfData}`, JSON.stringify(savedMarkers));
+    }
+  }, [savedMarkers, pdfData]);
+
+  // Load markers when component mounts
+  useEffect(() => {
+    const savedMarkersData = localStorage.getItem(`pdf-markers-${pdfData}`);
+    if (savedMarkersData) {
+      setSavedMarkers(JSON.parse(savedMarkersData));
+    }
+  }, [pdfData]);
+
+  // Create a separate function for handling save
+  const handleSaveResult = useCallback(async () => {
+    try {
+      setIsSaving(true);
+      
+      const marker = {
+        id: Date.now(),
+        position: buttonPosition.y,
+        results: evaluationResults,
+        timestamp: new Date().toLocaleString()
+      };
+
+      // Update markers state using functional update
+      setSavedMarkers(prev => [...prev, marker]);
+
+      // Save to localStorage asynchronously
+      await Promise.resolve(
+        localStorage.setItem(
+          `pdf-markers-${pdfData}`, 
+          JSON.stringify([...savedMarkers, marker])
+        )
+      );
+
+      handleCloseResults();
+      toast.success('Result saved successfully!');
+    } catch (error) {
+      console.error('Error saving result:', error);
+      toast.error('Failed to save result');
+    } finally {
+      setIsSaving(false);
+    }
+  }, [buttonPosition.y, evaluationResults, pdfData, savedMarkers]);
 
   return (
     <div className="min-h-screen bg-gray-100 p-8">
@@ -473,14 +575,27 @@ const PdfViewer = () => {
                   Total Score: {((evaluationResults.totalScore/5)*100).toFixed(2)}%
                 </span>
               </div>
-              <button 
-                onClick={handleCloseResults}
-                className="text-gray-500 hover:text-gray-700 transition-colors"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+              <div className="flex space-x-4">
+                <button
+                  onClick={handleSaveResult}
+                  disabled={isSaving}
+                  className={`px-4 py-2 ${
+                    isSaving 
+                      ? 'bg-gray-400 cursor-not-allowed' 
+                      : 'bg-green-500 hover:bg-green-600'
+                  } text-white rounded-lg transition-colors`}
+                >
+                  {isSaving ? 'Saving...' : 'Save Result'}
+                </button>
+                <button 
+                  onClick={handleCloseResults}
+                  className="text-gray-500 hover:text-gray-700 transition-colors"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
             </div>
             
             <div className="max-h-[70vh] overflow-y-auto pr-2">
@@ -577,8 +692,23 @@ const PdfViewer = () => {
           </button>
         )}
 
-        {/* PDF Viewer */}
-        <div className="bg-white rounded-lg shadow-sm" style={{ height: 'calc(100vh - 150px)' }}>
+        {/* PDF Viewer Container */}
+        <div className="bg-white rounded-lg shadow-sm relative" style={{ height: 'calc(100vh - 150px)' }}>
+          {/* Markers */}
+          <div className="absolute right-0 top-0 h-full">
+            {savedMarkers.map(marker => (
+              <MarkerButton
+                key={marker.id}
+                marker={marker}
+                onClick={(marker) => {
+                  setEvaluationResults(marker.results);
+                  setShowResults(true);
+                }}
+              />
+            ))}
+          </div>
+
+          {/* PDF Viewer */}
           <Worker workerUrl="https://unpkg.com/pdfjs-dist@3.4.120/build/pdf.worker.min.js">
             <Viewer
               fileUrl={pdfData}
