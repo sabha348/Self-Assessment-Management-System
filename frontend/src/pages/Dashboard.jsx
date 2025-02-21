@@ -4,7 +4,7 @@ import { uploadFile } from '../services/fileService';
 import { toast } from 'react-toastify';
 import { useNavigate  } from 'react-router-dom';
 import Logout  from '../components/auth/Logout'; //imported the logout 
-
+import {User} from 'lucide-react';
 
 
 
@@ -150,6 +150,24 @@ const Dashboard = () => {
           <div className="absolute left-full ml-2 hidden group-hover:flex items-center">
             <div className="bg-black text-white text-sm py-1 px-2 rounded whitespace-nowrap">
               Logout
+            </div>
+            <div className="absolute left-0 transform -translate-x-1 w-2 h-2 bg-black rotate-45"></div>
+          </div>
+        </div>
+
+        {/* Profile Management Icon with Tooltip */}
+        <div className="relative group">
+          <div
+            className="p-2 rounded-lg hover:bg-gray-100 cursor-pointer"
+            onClick={() => navigate('/profile')}
+          >
+            <User className="w-6 h-6 text-gray-600" />
+          </div>
+
+          {/* Tooltip */}
+          <div className="absolute left-full ml-2 hidden group-hover:flex items-center">
+            <div className="bg-black text-white text-sm py-1 px-2 rounded whitespace-nowrap">
+              Profile
             </div>
             <div className="absolute left-0 transform -translate-x-1 w-2 h-2 bg-black rotate-45"></div>
           </div>
