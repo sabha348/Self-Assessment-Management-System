@@ -4,6 +4,7 @@ const bodyParser = require("body-parser");
 const connectDB = require('./config/db');
 const userRoutes = require('./routes/userRouter');
 const fileRoutes = require('./routes/fileRoutes');
+const timetableRoutes = require('./routes/timetableRoutes');
 const assessmentRoutes = require('./routes/assessmentRouter');
 const registerUser = require('./authentication/register');
 const loginUser = require('./authentication/login'); 
@@ -32,6 +33,8 @@ app.use('/api/auth/register', registerUser);
 app.use('/api/auth/login', loginUser);
 app.use('/user', userRoutes);
 app.use('/api/files', fileRoutes);
+app.use('/api/timetable',timetableRoutes);
+
 
 // Test route
 app.get('/api/test', (req, res) => {

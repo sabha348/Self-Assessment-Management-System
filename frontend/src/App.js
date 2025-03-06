@@ -22,6 +22,8 @@ import NotFound from './pages/NotFound';
 import PdfViewer from './pages/PdfViewer';
 import FilesList from './pages/FilesList';
 import Timetable from './pages/Timetable';
+import ProfileMenu from './pages/ProfileMenu';
+import AddEntry from './components/AddEntry';
 
 // MUI Theme Configuration
 const theme = createTheme({
@@ -66,6 +68,7 @@ function App() {
                 
                 <Route path="/files" element={<FilesList />} />
                 <Route path="/timetable" element={<Timetable />} />
+                <Route path="/profile" element= {<ProfileMenu />} />
 
                 <Route 
                   path="/questions" 
@@ -88,6 +91,7 @@ function App() {
                 <Route path="/pdf-viewer" element={<PdfViewer />} />
                 
                 <Route path="*" element={<Login/>} />
+                <Route path="/entry" element={ <AddEntry /> } />
               </Routes>
               <ToastContainer 
                 position="top-right"

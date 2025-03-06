@@ -22,8 +22,8 @@ def handle_assessment(input_text: str, num_questions: int = 5) -> List[str]:
             raise ValueError("Empty input text received")
 
         # Get API key
-        api_key = os.getenv('HUGGINGFACE_API_KEY')
-        # api_key = os.getenv('GOOGLE_API_KEY')
+        # api_key = os.getenv('HUGGINGFACE_API_KEY')
+        api_key = os.getenv('GOOGLE_API_KEY')
         if not api_key:
             raise ValueError("API key not found in environment variables")
 

@@ -1,0 +1,125 @@
+import React, { useState, useEffect } from "react";
+import axios from "axios";
+import { TextField, Button, MenuItem, Box, Card, Typography } from "@mui/material";
+import { TimePicker, LocalizationProvider } from "@mui/x-date-pickers";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+import dayjs from "dayjs";
+import { useNavigate } from "react-router-dom";
+
+const AddEntry = ({ onEntryAdded }) => {
+  const navigate = useNavigate();
+  const [day, setDay] = useState("");
+  const [subjectName, setSubjectName] = useState("");
+  const [startTime, setStartTime] = useState(null);
+  const [endTime, setEndTime] = useState(null);
+
+  // Token state
+  const [token, setToken] = useState(localStorage.getItem("token"));
+
+  useEffect(() => {
+    if (!token) {
+      navigate("/login"); // Redirect if not authenticated
+    }
+  }, [token, navigate]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    // Validation: Ensure End Time is after Start Time
+    if (startTime && endTime && dayjs(endTime).isBefore(startTime)) {
+      alert("End time must be after start time.");
+      return;
+    }
+
+    try {
+      await axios.post(
+        "http://localhost:8000/api/timetable",
+        {
+          day,
+          subjects: [
+            {
+              subjectName,
+              startTime: startTime ? dayjs(startTime).format("HH:mm") : null,
+              endTime: endTime ? dayjs(endTime).format("HH:mm") : null,
+            },
+          ],
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      alert("Entry added successfully!");
+      setDay("");
+      setSubjectName("");
+      setStartTime(null);
+      setEndTime(null);
+      if (onEntryAdded) onEntryAdded();
+      navigate("/timetable"); // Redirect to timetable after adding entry
+    } catch (err) {
+      console.error(err);
+      alert("Failed to add entry. Please try again.");
+    }
+  };
+
+  return (
+    <LocalizationProvider dateAdapter={AdapterDayjs}>
+      <Box sx={{ display: "flex", justifyContent: "center", mt: 4 }}>
+        <Card sx={{ p: 4, width: 400, borderRadius: 2, boxShadow: 5, bgcolor: "#f9f9f9" }}>
+          <Typography variant="h5" align="center" sx={{ mb: 2, fontWeight: "bold", color: "#1976d2" }}>
+            Add Timetable Entry
+          </Typography>
+          <TextField
+            select
+            label="Day"
+            value={day}
+            onChange={(e) => setDay(e.target.value)}
+            required
+            fullWidth
+            sx={{ mb: 2 }}
+          >
+            {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map((d) => (
+              <MenuItem key={d} value={d}>
+                {d}
+              </MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            label="Subject Name"
+            value={subjectName}
+            onChange={(e) => setSubjectName(e.target.value)}
+            required
+            fullWidth
+            sx={{ mb: 2 }}
+          />
+          <TimePicker
+            label="Start Time"
+            value={startTime}
+            onChange={(newTime) => setStartTime(newTime)}
+            sx={{ mb: 2, width: "100%" }}
+          />
+          <TimePicker
+            label="End Time"
+            value={endTime}
+            onChange={(newTime) => setEndTime(newTime)}
+            sx={{ mb: 2, width: "100%" }}
+          />
+          
+          {/* Buttons for navigation */}
+          <Box sx={{ display: "flex", justifyContent: "space-between", mt: 2 }}>
+            <Button variant="outlined" color="secondary" onClick={() => navigate("/timetable")}>
+              Back to Timetable
+            </Button>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={handleSubmit}
+            >
+              Add Entry
+            </Button>
+          </Box>
+        </Card>
+      </Box>
+    </LocalizationProvider>
+  );
+};
+
+export default AddEntry;
