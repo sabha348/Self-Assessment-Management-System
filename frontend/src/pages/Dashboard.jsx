@@ -1,11 +1,11 @@
-import React, { useRef, useState,useEffect } from 'react';
-import { Book, Brain, Calculator, Layers, PenTool, Folder, Plus, Home, CreditCard, FolderArchive, FolderCheck, Clock, Calendar, CalendarCheck } from 'lucide-react';
-import { uploadFile } from '../services/fileService';
+import React, { useRef, useState, useEffect } from 'react';
+import { Book, Brain, Calculator, Layers, PenTool, Folder, Plus, Home, CreditCard, FolderArchive, FolderCheck, Clock, Calendar, CalendarCheck } from 'lucide-react';import { uploadFile } from '../services/fileService';
 import { toast } from 'react-toastify';
 import { useNavigate  } from 'react-router-dom';
 import Logout  from '../components/auth/Logout'; //imported the logout 
 import {User} from 'lucide-react';
 import ProfileMenu from './ProfileMenu';
+import axios from 'axios';
 
 
 const Dashboard = () => {
@@ -13,10 +13,67 @@ const Dashboard = () => {
   const fileInputRef = useRef(null);
   const [pdfData, setPdfData] = useState(null);
   const [numPages, setNumPages] = useState(null);
+  const [timetable, setTimetable] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const handlePlusClick = () => {
     fileInputRef.current.click();
   };
+
+  useEffect(() => {
+    const fetchTimetable = async () => {
+      setLoading(true);
+      try {
+        const token = localStorage.getItem("token");
+        if (!token) {
+          navigate('/login');
+          return;
+        }
+
+        const response = await axios.get("http://localhost:8000/api/timetable", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        // Group the timetable entries by day
+        const groupedTimetable = response.data.reduce((acc, entry) => {
+          if (!acc[entry.day]) {
+            acc[entry.day] = [];
+          }
+          acc[entry.day].push({
+            id: entry._id,
+            subjectName: entry.subjectName,
+            startTime: entry.startTime,
+            endTime: entry.endTime,
+            isFinished: entry.isFinished
+          });
+          return acc;
+        }, {});
+
+        setTimetable(groupedTimetable);
+      } catch (error) {
+        console.error("Error fetching timetable:", error);
+        setError("Failed to load timetable");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTimetable();
+  }, [navigate]);
+
+  const sortByTime = (entries) => {
+    return entries.sort((a, b) => {
+      const timeA = a.startTime.replace(':', '');
+      const timeB = b.startTime.replace(':', '');
+      return timeA - timeB;
+    });
+  };
+
+  
+  
 
 
   const [token, setToken] = useState(localStorage.getItem('token'));
@@ -204,29 +261,53 @@ const Dashboard = () => {
         <div className="mt-8">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold">Timetable</h2>
-            <button className="p-2 hover:bg-gray-100 rounded-full">
+            <button 
+              className="p-2 hover:bg-gray-100 rounded-full"
+              onClick={() => navigate('/entry')}
+            >
               <Plus className="w-5 h-5 text-gray-600" />
             </button>
           </div>
           
-          <div className="grid grid-cols-7 gap-4">
-            {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, index) => (
-              <div key={day} className="p-4 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="font-medium text-gray-700">{day}</span>
-                  <Clock className="w-4 h-4 text-gray-500" />
-                </div>
-                <div className="space-y-2">
-                  <div className="p-2 bg-blue-50 rounded text-sm text-blue-700">
-                    9:00 AM - Study
+          {loading ? (
+            <div className="text-center py-4">Loading timetable...</div>
+          ) : error ? (
+            <div className="text-center py-4 text-red-500">{error}</div>
+          ) : (
+            <div className="grid grid-cols-7 gap-4">
+              {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map((day) => (
+                <div key={day} className="p-4 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="font-medium text-gray-700">{day}</span>
+                    <Clock className="w-4 h-4 text-gray-500" />
                   </div>
-                  <div className="p-2 bg-green-50 rounded text-sm text-green-700">
-                    2:00 PM - Practice
+                  <div className="space-y-2">
+                    {timetable[day] && sortByTime(timetable[day]).map((entry) => (
+                      <div
+                        key={entry.id}
+                        className={`p-2 rounded text-sm ${
+                          entry.isFinished 
+                            ? "bg-gray-100 text-gray-500" 
+                            : "bg-blue-50 text-blue-700"
+                        }`}
+                      >
+                        <div className="font-medium">{entry.subjectName}</div>
+                        <div className="text-xs">
+                          {entry.startTime} - {entry.endTime}
+                        </div>
+                      </div>
+                    ))}
+                    {(!timetable[day] || timetable[day].length === 0) && (
+                      <div className="text-sm text-gray-400 text-center">
+                        No classes scheduled
+                      </div>
+                    )}
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
+
 
           {/* Weekly Overview */}
           <div className="mt-6 p-4 bg-white rounded-lg shadow-sm">

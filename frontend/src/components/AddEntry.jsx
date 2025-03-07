@@ -12,6 +12,7 @@ const AddEntry = ({ onEntryAdded }) => {
   const [subjectName, setSubjectName] = useState("");
   const [startTime, setStartTime] = useState(null);
   const [endTime, setEndTime] = useState(null);
+  const [error, setError] = useState(""); // New state for error handling
 
   // Token state
   const [token, setToken] = useState(localStorage.getItem("token"));
@@ -24,10 +25,17 @@ const AddEntry = ({ onEntryAdded }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+    setError(""); // Clear any previous errors
+
+    // Form validation
+    if (!day || !subjectName || !startTime || !endTime) {
+      setError("Please fill in all fields");
+      return;
+    }
+
     // Validation: Ensure End Time is after Start Time
-    if (startTime && endTime && dayjs(endTime).isBefore(startTime)) {
-      alert("End time must be after start time.");
+    if (dayjs(endTime).isBefore(startTime)) {
+      setError("End time must be after start time");
       return;
     }
 
@@ -36,37 +44,60 @@ const AddEntry = ({ onEntryAdded }) => {
         "http://localhost:8000/api/timetable",
         {
           day,
-          subjects: [
-            {
-              subjectName,
-              startTime: startTime ? dayjs(startTime).format("HH:mm") : null,
-              endTime: endTime ? dayjs(endTime).format("HH:mm") : null,
-            },
-          ],
+          subjectName,
+          startTime: dayjs(startTime).format("HH:mm"),
+          endTime: dayjs(endTime).format("HH:mm")
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
+      // Success handling
       alert("Entry added successfully!");
-      setDay("");
-      setSubjectName("");
-      setStartTime(null);
-      setEndTime(null);
+      resetForm();
       if (onEntryAdded) onEntryAdded();
       navigate("/timetable"); // Redirect to timetable after adding entry
     } catch (err) {
       console.error(err);
-      alert("Failed to add entry. Please try again.");
+      setError(err.response?.data?.error || "Failed to add entry. Please try again.");
     }
+  };
+
+  const resetForm = () => {
+    setDay("");
+    setSubjectName("");
+    setStartTime(null);
+    setEndTime(null);
+    setError("");
   };
 
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs}>
       <Box sx={{ display: "flex", justifyContent: "center", mt: 4 }}>
-        <Card sx={{ p: 4, width: 400, borderRadius: 2, boxShadow: 5, bgcolor: "#f9f9f9" }}>
-          <Typography variant="h5" align="center" sx={{ mb: 2, fontWeight: "bold", color: "#1976d2" }}>
+        <Card sx={{ 
+          p: 4, 
+          width: 400, 
+          borderRadius: 2, 
+          boxShadow: 5, 
+          bgcolor: "#f9f9f9"
+        }}>
+          <Typography 
+            variant="h5" 
+            align="center" 
+            sx={{ mb: 2, fontWeight: "bold", color: "#1976d2" }}
+          >
             Add Timetable Entry
           </Typography>
+
+          {/* Error Message Display */}
+          {error && (
+            <Typography 
+              color="error" 
+              sx={{ mb: 2, textAlign: "center" }}
+            >
+              {error}
+            </Typography>
+          )}
+
           <TextField
             select
             label="Day"
@@ -76,12 +107,21 @@ const AddEntry = ({ onEntryAdded }) => {
             fullWidth
             sx={{ mb: 2 }}
           >
-            {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map((d) => (
+            {[
+              "Monday",
+              "Tuesday",
+              "Wednesday",
+              "Thursday",
+              "Friday",
+              "Saturday",
+              "Sunday"
+            ].map((d) => (
               <MenuItem key={d} value={d}>
                 {d}
               </MenuItem>
             ))}
           </TextField>
+
           <TextField
             label="Subject Name"
             value={subjectName}
@@ -90,12 +130,14 @@ const AddEntry = ({ onEntryAdded }) => {
             fullWidth
             sx={{ mb: 2 }}
           />
+
           <TimePicker
             label="Start Time"
             value={startTime}
             onChange={(newTime) => setStartTime(newTime)}
             sx={{ mb: 2, width: "100%" }}
           />
+
           <TimePicker
             label="End Time"
             value={endTime}
@@ -103,15 +145,24 @@ const AddEntry = ({ onEntryAdded }) => {
             sx={{ mb: 2, width: "100%" }}
           />
           
-          {/* Buttons for navigation */}
-          <Box sx={{ display: "flex", justifyContent: "space-between", mt: 2 }}>
-            <Button variant="outlined" color="secondary" onClick={() => navigate("/timetable")}>
+          {/* Navigation Buttons */}
+          <Box sx={{ 
+            display: "flex", 
+            justifyContent: "space-between", 
+            mt: 2 
+          }}>
+            <Button 
+              variant="outlined" 
+              color="secondary" 
+              onClick={() => navigate("/timetable")}
+            >
               Back to Timetable
             </Button>
             <Button
               variant="contained"
               color="primary"
               onClick={handleSubmit}
+              disabled={!day || !subjectName || !startTime || !endTime}
             >
               Add Entry
             </Button>
