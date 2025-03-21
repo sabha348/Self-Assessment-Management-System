@@ -24,6 +24,7 @@ import FilesList from './pages/FilesList';
 import Timetable from './pages/Timetable';
 import ProfileMenu from './pages/ProfileMenu';
 import AddEntry from './components/AddEntry';
+// import Account from './components/Account';
 
 // MUI Theme Configuration
 const theme = createTheme({
@@ -87,7 +88,8 @@ function App() {
                     </PrivateRoute>
                   } 
                 />
-                
+
+                                
                 <Route path="/pdf-viewer" element={<PdfViewer />} />
                 
                 <Route path="*" element={<Login/>} />
