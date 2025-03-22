@@ -24,7 +24,10 @@ import FilesList from './pages/FilesList';
 import Timetable from './pages/Timetable';
 import ProfileMenu from './pages/ProfileMenu';
 import AddEntry from './components/AddEntry';
-// import Account from './components/Account';
+// New imports
+import Practice from './pages/Practice';
+import Assessment from './pages/Assessment';
+import SkillAnalysis from './pages/SkillAnalysis';
 
 // MUI Theme Configuration
 const theme = createTheme({
@@ -58,6 +61,8 @@ function App() {
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
                 <Route path="/logout" element={<Logout />} />
+                
+                {/* Dashboard */}
                 <Route 
                   path="/dashboard" 
                   element={
@@ -67,19 +72,22 @@ function App() {
                   } 
                 />
                 
+                {/* Files and Resource Routes */}
                 <Route path="/files" element={<FilesList />} />
-                <Route path="/timetable" element={<Timetable />} />
-                <Route path="/profile" element= {<ProfileMenu />} />
-
-                <Route 
-                  path="/questions" 
-                  element={
-                    <PrivateRoute>
-                      <QuestionGenerator />
-                    </PrivateRoute>
-                  } 
-                />
+                <Route path="/pdf-viewer" element={<PdfViewer />} />
                 
+                {/* Learning Routes */}
+                <Route path="/practice" element={<Practice />} />
+                <Route path="/skills" element={<SkillAnalysis />} />
+                <Route path="/assessment" element={<Assessment />} />
+                <Route path="/questions" element={<QuestionGenerator />} />
+
+                {/* Timetable Routes */}
+                <Route path="/timetable" element={<Timetable />} />
+                <Route path="/entry" element={<AddEntry />} />
+                
+                {/* Profile Routes */}
+                <Route path="/profile/menu" element={<ProfileMenu />} />
                 <Route 
                   path="/profile" 
                   element={
@@ -88,12 +96,9 @@ function App() {
                     </PrivateRoute>
                   } 
                 />
-
-                                
-                <Route path="/pdf-viewer" element={<PdfViewer />} />
                 
+                {/* Default Route */}
                 <Route path="*" element={<Login/>} />
-                <Route path="/entry" element={ <AddEntry /> } />
               </Routes>
               <ToastContainer 
                 position="top-right"

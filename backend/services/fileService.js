@@ -54,7 +54,7 @@ const getFileById = async (req, res) => {
     if (!file) {
       return res.status(404).json({ error: 'File not found' });
     }
-    res.json(file);
+    res.json(file); 
   } catch (error) {
     res.status(500).json({ error: 'Error fetching file' });
   }

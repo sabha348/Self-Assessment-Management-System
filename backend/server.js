@@ -9,9 +9,11 @@ const assessmentRoutes = require('./routes/assessmentRouter');
 const registerUser = require('./authentication/register');
 const loginUser = require('./authentication/login'); 
 const { upload, uploadFile, getFiles } = require('./services/fileService');
+const quizRouter = require('./routes/quizRouter');
+const mongoose = require('mongoose');
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 8000; // Changed port to 8000
 
 // Connect to database
 connectDB();
@@ -19,13 +21,14 @@ connectDB();
 // Middleware
 app.use(cors({
   origin: '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Added 'OPTIONS'
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 app.use(bodyParser.json());
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
+// Update body-parser configuration with increased limits
+app.use(express.json({ limit: '100mb' })); // Increased from 50mb to 100mb
+app.use(express.urlencoded({ limit: '100mb', extended: true, parameterLimit: 100000 })); // Added parameterLimit
 
 // Routes
 app.use('/api/assessment', assessmentRoutes);
@@ -33,8 +36,8 @@ app.use('/api/auth/register', registerUser);
 app.use('/api/auth/login', loginUser);
 app.use('/user', userRoutes);
 app.use('/api/files', fileRoutes);
-app.use('/api/timetable',timetableRoutes);
-
+app.use('/api/timetable', timetableRoutes); // Keeping this existing route
+app.use('/api/quizzes', quizRouter); // Added new quiz router
 
 // Test route
 app.get('/api/test', (req, res) => {

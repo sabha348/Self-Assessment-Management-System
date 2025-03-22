@@ -10,7 +10,8 @@
 # class AssessmentSystem:
 #     def __init__(self,
 #                  api_key: str,
-#                  model: str = "mistralai/Mistral-Nemo-Instruct-2407",
+#                  model: str = "Mistral-Nemo-Instruct-2407",
+#                 #  model: str = "microsoft/phi-4",
 #                 #  model: str = "gpt-4o-mini",
 #                  accuracy_threshold: int = 70,
 #                  evaluation_mode: str = 'balanced'):
@@ -407,7 +408,7 @@ from typing import List, Dict, Optional
 class AssessmentSystem:
     def __init__(self,
                  api_key: str,
-                 model: str = "gemini-pro",  # Changed default model
+                 model: str = "gemini-2.0-flash-lite",  # Changed default model
                  accuracy_threshold: int = 70,
                  evaluation_mode: str = 'balanced'):
         """

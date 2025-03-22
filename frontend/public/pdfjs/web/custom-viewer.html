@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PDF Viewer</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        font-family: Arial, sans-serif;
+      }
+      #viewerContainer {
+        width: 100%;
+        height: 100vh;
+        overflow-y: auto;
+        overflow-x: hidden;
+        background-color: #f0f0f0;
+      }
+      .page-container {
+        margin: 20px auto;
+        position: relative;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        background-color: white;
+      }
+      .page-number {
+        position: absolute;
+        bottom: 10px;
+        right: 10px;
+        background: rgba(0, 0, 0, 0.6);
+        color: white;
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: bold;
+      }
+      .loading-message {
+        text-align: center;
+        padding: 20px;
+        color: #333;
+        font-size: 16px;
+        margin-top: 100px;
+      }
+      .error-message {
+        text-align: center;
+        padding: 20px;
+        color: #e53935;
+        font-size: 16px;
+        margin-top: 100px;
+        background-color: #ffebee;
+        border-radius: 4px;
+        max-width: 80%;
+        margin-left: auto;
+        margin-right: auto;
+      }
+      /* Text layer styles */
+      .textLayer {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        overflow: visible;
+        opacity: 0.2;
+        user-select: text !important;
+        -webkit-user-select: text !important;
+        -moz-user-select: text !important;
+        -ms-user-select: text !important;
+        pointer-events: auto !important;
+        cursor: text !important;
+      }
+
+      .textLayer > span {
+        color: transparent;
+        position: absolute;
+        white-space: pre;
+        cursor: text !important;
+        transform-origin: 0% 0%;
+        user-select: text !important;
+        -webkit-user-select: text !important;
+        -moz-user-select: text !important;
+        -ms-user-select: text !important;
+        pointer-events: auto !important;
+      }
+
+      .textLayer .highlight {
+        margin: -1px;
+        padding: 1px;
+        background-color: rgb(180, 0, 170);
+        border-radius: 4px;
+      }
+
+      .textLayer .highlight.selected {
+        background-color: rgb(0, 100, 0);
+      }
+
+      /* This class is added after text layer is fully rendered */
+      .textLayer.enabled {
+        pointer-events: auto;
+      }
+
+      /* Make text selection more visible */
+      ::selection {
+        background: rgba(0, 100, 255, 0.5) !important;
+      }
+
+      /* Special class for fully rendered text layers */
+      .textLayer.fully-rendered {
+        opacity: 0.3;
+      }
+
+      /* Add this to ensure text selection works across lines */
+      .textLayer span {
+        min-width: 1px;
+        min-height: 1px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="viewerContainer">
+      <div id="loading" class="loading-message">Initializing PDF viewer...</div>
+    </div>
+
+    <script src="/pdfjs/build/pdf.min.js"></script>
+    <script src="/pdfjs/web/pdf_viewer.js"></script>
+    <script>
+      // Set worker source
+      pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdfjs/build/pdf.worker.min.js";
+
+      // DOM elements
+      const viewerContainer = document.getElementById("viewerContainer");
+      const loadingElement = document.getElementById("loading");
+
+      // Variables to track state
+      let pdfDoc = null;
+      let currentPdfUrl = null;
+      let isRendering = false;
+      let retryCount = 0;
+      const MAX_RETRIES = 3;
+      const RETRY_DELAY = 2000;
+
+      // Track mouse positions for better selection
+let mouseDownPos = { x: 0, y: 0 };
+
+// Improved mousedown handler
+document.addEventListener('mousedown', function(e) {
+  // Record starting position
+  mouseDownPos = { x: e.clientX, y: e.clientY };
+});
+
+// Advanced text selection handler
+document.addEventListener('mouseup', function(e) {
+  // Use requestAnimationFrame to ensure selection is complete
+  requestAnimationFrame(() => {
+    const selection = window.getSelection();
+    let text = selection.toString().trim();
+    
+    if (text.length > 0) {
+      try {
+        const range = selection.getRangeAt(0);
+        const rect = range.getBoundingClientRect();
+        
+        // Only send message if we have meaningful text
+        window.parent.postMessage({
+          type: 'textSelected',
+          text: text,
+          rect: {
+            left: rect.left,
+            top: rect.top,
+            width: rect.width,
+            height: rect.height
+          }
+        }, '*');
+        
+        console.log('Text selected:', text, 'Length:', text.length);
+      } catch (err) {
+        console.error('Error handling selection:', err);
+      }
+    } else {
+      window.parent.postMessage({
+        type: 'clearSelection'
+      }, '*');
+    }
+  });
+});
+
+// Add a special text selection helper for smaller text fragments
+const textFragmentHelper = document.createElement('div');
+textFragmentHelper.style.position = 'absolute';
+textFragmentHelper.style.pointerEvents = 'none';
+textFragmentHelper.style.zIndex = '-1';
+textFragmentHelper.style.userSelect = 'none';
+document.body.appendChild(textFragmentHelper);
+
+// Helper function to attempt to select text when standard selection fails
+viewerContainer.addEventListener('dblclick', function(e) {
+  // Only trigger on text layer elements
+  if (!e.target.closest('.textLayer')) return;
+  
+  // Get surrounding text elements
+  const textLayer = e.target.closest('.textLayer');
+  const spans = Array.from(textLayer.querySelectorAll('span'));
+  
+  // Find the closest text span
+  const clickX = e.clientX;
+  const clickY = e.clientY;
+  
+  let closestSpan = null;
+  let minDistance = Infinity;
+  
+  spans.forEach(span => {
+    const rect = span.getBoundingClientRect();
+    const spanX = rect.left + rect.width / 2;
+    const spanY = rect.top + rect.height / 2;
+    
+    const distance = Math.sqrt(
+      Math.pow(clickX - spanX, 2) + 
+      Math.pow(clickY - spanY, 2)
+    );
+    
+    if (distance < minDistance) {
+      minDistance = distance;
+      closestSpan = span;
+    }
+  });
+  
+  // If we found a close span, select it
+  if (closestSpan) {
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(closestSpan);
+    selection.removeAllRanges();
+    selection.addRange(range);
+    
+    // Trigger the standard mouseup handler to send the selection
+    document.dispatchEvent(new MouseEvent('mouseup'));
+  }
+});
+
+      // Add this to prevent text deselection when clicking inside text layer
+      viewerContainer.addEventListener("click", function (e) {
+        if (
+          e.target.closest(".textLayer") &&
+          window.getSelection().toString().trim().length > 0
+        ) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      });
+
+      // Helper functions for UI
+      function showLoading(message) {
+        if (!loadingElement) return;
+        loadingElement.textContent = message;
+        loadingElement.style.display = "block";
+      }
+
+      function hideLoading() {
+        if (!loadingElement) return;
+        loadingElement.style.display = "none";
+      }
+
+      function showError(message) {
+        // First clear any existing error messages
+        const existingErrors = document.querySelectorAll(".error-message");
+        existingErrors.forEach((el) => el.remove());
+
+        const errorElement = document.createElement("div");
+        errorElement.className = "error-message";
+        errorElement.textContent = message;
+        viewerContainer.appendChild(errorElement);
+      }
+
+      function clearViewerContent() {
+        // Keep only the loading element
+        const currentLoading = document.getElementById("loading");
+        viewerContainer.innerHTML = "";
+
+        if (currentLoading) {
+          viewerContainer.appendChild(currentLoading);
+        } else {
+          const newLoading = document.createElement("div");
+          newLoading.id = "loading";
+          newLoading.className = "loading-message";
+          viewerContainer.appendChild(newLoading);
+        }
+      }
+
+      // Get PDF URL from query parameter
+      function getPdfUrlFromParams() {
+        const urlParams = new URLSearchParams(window.location.search);
+        return urlParams.get("file");
+      }
+
+      // Main function to load and render PDF
+      async function loadAndRenderPdf(url) {
+        // Validate URL
+        if (!url) {
+          const errorMsg = "No PDF URL provided";
+          console.error(errorMsg);
+          showError(errorMsg);
+          notifyParent("loadError", errorMsg);
+          return false;
+        }
+
+        // Add this after your loadAndRenderPdf function
+
+// Special fixes for text selection issues
+function applyTextSelectionFixes() {
+  // Watch for changes to the DOM that might add new pages
+  const observer = new MutationObserver((mutations) => {
+    for (const mutation of mutations) {
+      if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+        // Check for new textLayer divs
+        document.querySelectorAll('.textLayer:not([data-fixed="true"])').forEach(textLayer => {
+          // Apply fixes to this text layer
+          improveTextLayer(textLayer);
+          
+          // Mark as fixed
+          textLayer.setAttribute('data-fixed', 'true');
+        });
+      }
+    }
+  });
+  
+  // Start observing
+  observer.observe(viewerContainer, { childList: true, subtree: true });
+  
+  // Check existing text layers too
+  document.querySelectorAll('.textLayer:not([data-fixed="true"])').forEach(textLayer => {
+    improveTextLayer(textLayer);
+    textLayer.setAttribute('data-fixed', 'true');
+  });
+}
+
+// Function to improve an individual text layer
+function improveTextLayer(textLayerDiv) {
+  // Make sure the textLayer is properly styled
+  textLayerDiv.style.userSelect = 'text';
+  textLayerDiv.style.pointerEvents = 'auto';
+  textLayerDiv.style.overflow = 'visible';
+  
+  // Fix all spans in this text layer
+  const spans = textLayerDiv.querySelectorAll('span');
+  spans.forEach(span => {
+    // Make sure the span is selectable
+    span.style.userSelect = 'text';
+    span.style.pointerEvents = 'auto';
+    span.style.cursor = 'text';
+    
+    // Add a very small transparent border to help with selection
+    span.style.border = '0.1px solid transparent';
+    
+    // Make sure the span is not too small to be clickable
+    if (span.offsetWidth < 4 || span.offsetHeight < 4) {
+      span.style.minWidth = '4px';
+      span.style.minHeight = '4px';
+    }
+  });
+}
+
+// Call this after PDF is loaded
+document.addEventListener('DOMContentLoaded', () => {
+  applyTextSelectionFixes();
+});
+
+// Also call it periodically to catch any newly rendered pages
+setInterval(applyTextSelectionFixes, 2000);
+        // Update state
+        currentPdfUrl = url;
+        retryCount = 0;
+
+        // Clear existing content and show loading
+        clearViewerContent();
+        showLoading("Loading PDF document...");
+
+        console.log(`Loading PDF from URL: ${url}`);
+
+        try {
+          // Load the PDF document
+          pdfDoc = await pdfjsLib.getDocument(url).promise;
+          console.log(`PDF loaded successfully with ${pdfDoc.numPages} pages`);
+
+          // Start rendering all pages
+          await renderAllPages();
+          return true;
+        } catch (error) {
+          console.error("Error loading PDF:", error);
+
+          // Handle retry logic
+          if (retryCount < MAX_RETRIES) {
+            retryCount++;
+            const retryMsg = `Error loading PDF. Retrying (${retryCount}/${MAX_RETRIES})...`;
+            console.log(retryMsg);
+            showLoading(retryMsg);
+
+            // Schedule retry
+            setTimeout(() => {
+              loadAndRenderPdf(url);
+            }, RETRY_DELAY);
+          } else {
+            // Max retries reached
+            const errorMsg = `Failed to load PDF after ${MAX_RETRIES} attempts: ${error.message}`;
+            console.error(errorMsg);
+            showError(errorMsg);
+            notifyParent("loadError", errorMsg);
+          }
+          return false;
+        }
+      }
+
+      // Render all pages of the PDF
+      async function renderAllPages() {
+        if (!pdfDoc) {
+          console.error("No PDF document loaded");
+          return false;
+        }
+
+        const totalPages = pdfDoc.numPages;
+        showLoading(`Rendering ${totalPages} pages...`);
+
+        // Clear existing page content before rendering
+        clearViewerContent();
+
+        // Create a container specifically for pages
+        const pagesContainer = document.createElement("div");
+        pagesContainer.id = "pages-container";
+        viewerContainer.appendChild(pagesContainer);
+
+        try {
+          // Render each page in sequence
+          for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+            showLoading(`Rendering page ${pageNum} of ${totalPages}...`);
+            await renderSinglePage(pageNum, totalPages, pagesContainer);
+
+            // Notify parent after each page is rendered
+            notifyParent("pageLoaded", {
+              currentPage: pageNum,
+              totalPages: totalPages,
+            });
+          }
+
+          // Rendering complete
+          hideLoading();
+          notifyParent("pageLoaded", {
+            currentPage: totalPages,
+            totalPages: totalPages,
+            allPagesLoaded: true,
+          });
+          console.log("All pages rendered successfully");
+          return true;
+        } catch (error) {
+          console.error("Error rendering pages:", error);
+          showError(`Failed to render PDF pages: ${error.message}`);
+          notifyParent(
+            "loadError",
+            `Failed to render PDF pages: ${error.message}`
+          );
+          return false;
+        }
+      }
+
+      // Replace the current renderSinglePage function with this improved version
+      async function renderSinglePage(pageNum, totalPages, container) {
+        try {
+          const page = await pdfDoc.getPage(pageNum);
+          const viewport = page.getViewport({ scale: 1.0 });
+          
+          const pageContainer = document.createElement('div');
+          pageContainer.className = 'page-container';
+          pageContainer.id = `page-${pageNum}`;
+          pageContainer.style.width = `${viewport.width}px`;
+          pageContainer.style.height = `${viewport.height}px`;
+          
+          const canvas = document.createElement('canvas');
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+          pageContainer.appendChild(canvas);
+          
+          // Create and properly configure text layer div
+          const textLayerDiv = document.createElement('div');
+          textLayerDiv.className = 'textLayer';
+          textLayerDiv.style.width = `${viewport.width}px`;
+          textLayerDiv.style.height = `${viewport.height}px`;
+          
+          // Append the text layer div to page container
+          pageContainer.appendChild(textLayerDiv);
+          container.appendChild(pageContainer);
+          
+          // Render the page canvas
+          const renderContext = {
+            canvasContext: canvas.getContext('2d'),
+            viewport: viewport
+          };
+          await page.render(renderContext).promise;
+          
+          // Get the text content with a timeout to ensure it completes
+          const textContentPromise = new Promise((resolve, reject) => {
+            const timeoutId = setTimeout(() => {
+              reject(new Error(`Text content extraction timed out for page ${pageNum}`));
+            }, 5000);
+            
+            page.getTextContent().then(textContent => {
+              clearTimeout(timeoutId);
+              resolve(textContent);
+            }).catch(error => {
+              clearTimeout(timeoutId);
+              reject(error);
+            });
+          });
+          
+          try {
+            const textContent = await textContentPromise;
+            
+            // Use PDF.js text layer builder
+            const renderTextLayerParams = {
+              textContent: textContent,
+              container: textLayerDiv,
+              viewport: viewport.clone({dontFlip: false}),
+              enhanceTextSelection: true
+            };
+            
+            const textLayer = pdfjsLib.renderTextLayer(renderTextLayerParams);
+            
+            // Wait for text layer rendering to complete
+            await textLayer._capability.promise;
+            
+            // Apply additional enhancements to text layer after rendering
+            enhanceTextLayerSelectionCapability(textLayerDiv);
+          } catch (error) {
+            console.warn(`Warning: Text layer rendering issue on page ${pageNum}:`, error);
+            // Create a fallback text layer with basic functionality
+            createFallbackTextLayer(page, viewport, textLayerDiv);
+          }
+          
+          // Add page number indicator
+          const pageNumberDiv = document.createElement('div');
+          pageNumberDiv.className = 'page-number';
+          pageNumberDiv.textContent = `${pageNum} / ${totalPages}`;
+          pageContainer.appendChild(pageNumberDiv);
+          
+          return true;
+        } catch (error) {
+          console.error(`Error rendering page ${pageNum}:`, error);
+          throw error;
+        }
+      }
+
+      // New function to enhance text layer selection capability
+      function enhanceTextLayerSelectionCapability(textLayerDiv) {
+        // Set appropriate styles for the text layer
+        textLayerDiv.style.userSelect = 'text';
+        textLayerDiv.style.webkitUserSelect = 'text';
+        textLayerDiv.style.mozUserSelect = 'text';
+        textLayerDiv.style.msUserSelect = 'text';
+        textLayerDiv.style.pointerEvents = 'auto';
+        textLayerDiv.style.cursor = 'text';
+        
+        // Apply styles to all text spans
+        const spans = textLayerDiv.querySelectorAll('span');
+        spans.forEach(span => {
+          // Make each span properly selectable
+          span.style.userSelect = 'text';
+          span.style.webkitUserSelect = 'text';
+          span.style.mozUserSelect = 'text';
+          span.style.msUserSelect = 'text';
+          span.style.pointerEvents = 'auto';
+          span.style.cursor = 'text';
+          
+          // Add data attribute for debugging
+          span.setAttribute('data-selectable', 'true');
+          
+          // Fix any zero width/height spans
+          if (span.getBoundingClientRect().width < 1 || span.getBoundingClientRect().height < 1) {
+            span.style.padding = '1px';
+            span.style.minWidth = '4px';
+            span.style.minHeight = '4px';
+          }
+          
+          // Add a very small border to help with selection
+          span.style.border = '0.1px solid transparent';
+          
+          // Fix transform style to ensure proper text selection
+          if (span.style.transform) {
+            // Store original transform for reference
+            span.setAttribute('data-original-transform', span.style.transform);
+          }
+        });
+        
+        // Mark the text layer as enhanced
+        textLayerDiv.classList.add('enhanced');
+        textLayerDiv.classList.add('fully-rendered');
+      }
+
+      // Fallback text layer creation function
+      function createFallbackTextLayer(page, viewport, textLayerDiv) {
+        // Promise-based text extraction with timeout
+        return new Promise((resolve) => {
+          const extractTimeoutId = setTimeout(() => {
+            console.warn(`Fallback text extraction timed out for page`);
+            resolve();
+          }, 3000);
+          
+          page.getTextContent().then(textContent => {
+            clearTimeout(extractTimeoutId);
+            
+            // Clear any existing content
+            textLayerDiv.innerHTML = '';
+            
+            textContent.items.forEach(item => {
+              const tx = pdfjsLib.Util.transform(
+                viewport.transform,
+                item.transform
+              );
+              
+              const style = textContent.styles[item.fontName];
+              
+              // Create text span
+              const textSpan = document.createElement('span');
+              textSpan.textContent = item.str;
+              textSpan.style.fontFamily = style.fontFamily;
+              textSpan.style.fontSize = `${item.height}px`;
+              textSpan.style.position = 'absolute';
+              textSpan.style.left = `${tx[4]}px`;
+              textSpan.style.top = `${tx[5]}px`;
+              textSpan.style.transform = `scale(${tx[0]}, ${tx[3]})`;
+              textSpan.style.transformOrigin = '0% 0%';
+              
+              // Set selection properties
+              textSpan.style.userSelect = 'text';
+              textSpan.style.webkitUserSelect = 'text';
+              textSpan.style.mozUserSelect = 'text';
+              textSpan.style.msUserSelect = 'text';
+              textSpan.style.pointerEvents = 'auto';
+              textSpan.style.cursor = 'text';
+              textSpan.style.color = 'transparent';
+              textSpan.style.padding = '1px';
+              
+              textLayerDiv.appendChild(textSpan);
+            });
+            
+            // Mark as fallback
+            textLayerDiv.classList.add('fallback-text-layer');
+            resolve();
+          }).catch(() => {
+            clearTimeout(extractTimeoutId);
+            console.warn('Failed to extract text content for fallback');
+            resolve();
+          });
+        });
+      }
+
+      // Add this function to apply continuous improvements
+      function applyTextLayerFixes() {
+        // Fix for any newly rendered text layers
+        const unfixedLayers = document.querySelectorAll('.textLayer:not(.enhanced)');
+        unfixedLayers.forEach(textLayerDiv => {
+          enhanceTextLayerSelectionCapability(textLayerDiv);
+        });
+      }
+
+      // Add MutationObserver to detect new text layers
+      const textLayerObserver = new MutationObserver((mutations) => {
+        let needsFixing = false;
+        
+        for (const mutation of mutations) {
+          if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+            for (let i = 0; i < mutation.addedNodes.length; i++) {
+              const node = mutation.addedNodes[i];
+              if (node.classList && node.classList.contains('textLayer')) {
+                needsFixing = true;
+                break;
+              }
+            }
+          }
+        }
+        
+        if (needsFixing) {
+          // Use requestAnimationFrame to wait for the DOM to settle
+          requestAnimationFrame(() => {
+            applyTextLayerFixes();
+          });
+        }
+      });
+
+      // Start observing the document
+      textLayerObserver.observe(document.body, {
+        childList: true,
+        subtree: true
+      });
+
+      // Run fixes periodically for any missed text layers
+      setInterval(applyTextLayerFixes, 2000);
+
+      // Notify parent window
+      function notifyParent(type, data) {
+        const message =
+          typeof data === "string"
+            ? { type, message: data }
+            : { type, ...data };
+
+        window.parent.postMessage(message, "*");
+        console.log(`Notified parent: ${type}`, data);
+      }
+
+      // Listen for messages from parent window
+      window.addEventListener("message", (event) => {
+        console.log("Received message from parent:", event.data);
+
+        if (event.data.type === "updatePdfUrl") {
+          const newUrl = event.data.newUrl;
+          if (newUrl && newUrl !== currentPdfUrl) {
+            console.log(`Updating PDF URL to: ${newUrl}`);
+            loadAndRenderPdf(newUrl);
+          } else {
+            console.log("Received same URL or empty URL, ignoring update");
+          }
+        } else if (event.data.type === "addHighlight") {
+          // Handle highlighting text
+          console.log("Highlight request received:", event.data);
+          // You can implement text highlighting here
+        }
+      });
+
+      // Initial load from URL parameter
+      const initialUrl = getPdfUrlFromParams();
+      if (initialUrl) {
+        loadAndRenderPdf(initialUrl);
+      } else {
+        showLoading("Waiting for PDF URL...");
+        console.log("No initial URL, waiting for message from parent");
+      }
+    </script>
+  </body>
+</html>
