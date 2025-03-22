@@ -1,12 +1,12 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Book, Brain, Calculator, Layers, PenTool, Folder, Plus, Home, CreditCard, FolderArchive, FolderCheck, Clock, Calendar, CalendarCheck } from 'lucide-react';import { uploadFile } from '../services/fileService';
+import { Book, Brain, Calculator, Layers, PenTool, Folder, Plus, Home, CreditCard, FolderArchive, FolderCheck, Clock, Calendar, CalendarCheck } from 'lucide-react';
+import { uploadFile } from '../services/fileService';
 import { toast } from 'react-toastify';
-import { useNavigate  } from 'react-router-dom';
-import Logout  from '../components/auth/Logout'; //imported the logout 
-import {User} from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import Logout from '../components/auth/Logout'; //imported the logout 
+import { User } from 'lucide-react';
 import ProfileMenu from './ProfileMenu';
 import axios from 'axios';
-
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -21,6 +21,15 @@ const Dashboard = () => {
     fileInputRef.current.click();
   };
 
+  // Authentication check
+  const [token, setToken] = useState(localStorage.getItem('token'));
+  useEffect(() => {
+    if (!token) {
+      navigate('/login'); // Redirect to login if token is not found
+    }
+  }, [token, navigate]);
+
+  // Fetch timetable data from API
   useEffect(() => {
     const fetchTimetable = async () => {
       setLoading(true);
@@ -72,17 +81,6 @@ const Dashboard = () => {
     });
   };
 
-  
-  
-
-
-  const [token, setToken] = useState(localStorage.getItem('token'));
-  useEffect(() => {
-      if (!token) {
-          navigate('/login'); // Redirect to login if token is not found
-      }
-  }, [token, navigate]);
-
   const handleFileChange = async (event) => {
     const file = event.target.files[0];
     if (file) {
@@ -131,10 +129,6 @@ const Dashboard = () => {
       />
 
       {/* Sidebar */}
-      {/* This sidebar uses flexbox (flex flex-col) to arrange items vertically and center them horizontally (items-center)
-          It has white background (bg-white), subtle shadow (shadow-sm), 
-          padding of 1rem (16px) on top and bottom (py-4 where 4 = 1rem),
-          vertical spacing between children (space-y-6) and fixed width of 5rem (w-20) */}
       <div className="sidebar bg-white shadow-sm flex flex-col items-center py-4 space-y-6 w-20">
         {/* Home Icon with Tooltip */}
         <div className="relative group">
@@ -152,7 +146,7 @@ const Dashboard = () => {
           </div>
         </div>
         
-        {/* Folder Icon with Tooltip */}
+        {/* Timetable Icon with Tooltip */}
         <div className="relative group">
           <div className="p-2 rounded-lg hover:bg-gray-100 cursor-pointer"
               onClick={() => navigate('/timetable')}
@@ -170,7 +164,7 @@ const Dashboard = () => {
           </div>
         </div>
         
-        {/* Plus Icon with Tooltip */}
+        {/* Upload PDF Icon with Tooltip */}
         <div className="relative group">
           <div 
             className="p-2 rounded-lg hover:bg-gray-100 cursor-pointer"
@@ -189,59 +183,22 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Pro Badge - at the bottom */}
+        {/* Pro Badge */}
         <div className="mt-auto p-2 bg-black text-white rounded-lg">
           Pro
         </div>
         
-        {/* Logout Button */}
-        {/* <div className="relative group mt-auto">
-          <div
-            className="p-2 rounded-lg hover:bg-gray-100 cursor-pointer"
-            onClick={() => navigate('/logout')}
-          >
-            <FolderCheck className="w-6 h-6 text-gray-600" />
-          </div>
-
-          Tooltip
-          <div className="absolute left-full ml-2 hidden group-hover:flex items-center">
-            <div className="bg-black text-white text-sm py-1 px-2 rounded whitespace-nowrap">
-              Logout
-            </div>
-            <div className="absolute left-0 transform -translate-x-1 w-2 h-2 bg-black rotate-45"></div>
-          </div>
-        </div> */}
-
-        {/* Profile Management Icon with Tooltip */}
-        {/* <div className="relative group">
-          <div
-            className="p-2 rounded-lg hover:bg-gray-100 cursor-pointer"
-            onClick={() => navigate('/profile')}
-          >
-            <User className="w-6 h-6 text-gray-600" />
-          </div>
-
-          Tooltip
-          <div className="absolute left-full ml-2 hidden group-hover:flex items-center">
-            <div className="bg-black text-white text-sm py-1 px-2 rounded whitespace-nowrap">
-              Profile
-            </div>
-            <div className="absolute left-0 transform -translate-x-1 w-2 h-2 bg-black rotate-45"></div>
-          </div>
-        </div> */}
-
+        {/* Use ProfileMenu component instead of direct logout */}
         <ProfileMenu />
-        
-
       </div>
 
       {/* Main Content */}
       <div className="flex-1 p-8 max-w-7xl mx-auto">
-
         {/* Studying Section */}
         <div className="mb-8">
           <h2 className="text-xl font-semibold mb-4">Studying</h2>
           <div className="grid grid-cols-3 gap-4">
+            {/* Study Card */}
             <div className="p-6 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow"
               onClick={() => navigate('/files')}
             >
@@ -249,10 +206,23 @@ const Dashboard = () => {
               <h3 className="font-medium">Study</h3>
               <p className="text-sm text-gray-500">Learn swiftly</p>
             </div>
-            <div className="p-6 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow">
+            
+            {/* Practice Quiz Card */}
+            <div className="p-6 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow"
+              onClick={() => navigate('/practice')}
+            >
               <Brain className="w-6 h-6 mb-3 text-gray-600" />
               <h3 className="font-medium">Practice quiz</h3>
               <p className="text-sm text-gray-500">Test your knowledge</p>
+            </div>
+            
+            {/* Skill Analysis Card - NEW */}
+            <div className="p-6 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow"
+              onClick={() => navigate('/skills')}
+            >
+              <Calculator className="w-6 h-6 mb-3 text-gray-600" />
+              <h3 className="font-medium">Skill Analysis</h3>
+              <p className="text-sm text-gray-500">Track your progress</p>
             </div>
           </div>
         </div>
@@ -269,6 +239,7 @@ const Dashboard = () => {
             </button>
           </div>
           
+          {/* Keeping the existing timetable with API data */}
           {loading ? (
             <div className="text-center py-4">Loading timetable...</div>
           ) : error ? (
@@ -307,7 +278,6 @@ const Dashboard = () => {
               ))}
             </div>
           )}
-
 
           {/* Weekly Overview */}
           <div className="mt-6 p-4 bg-white rounded-lg shadow-sm">

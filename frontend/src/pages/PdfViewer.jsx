@@ -39,6 +39,10 @@ const PdfViewer = () => {
   const [startTime, setStartTime] = useState(Date.now());
   const [savedMarkers, setSavedMarkers] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
+  // Add timer-related state variables
+  const [quizEndTime, setQuizEndTime] = useState(null);
+  const [remainingTime, setRemainingTime] = useState(null);
+  const [quizTimerInterval, setQuizTimerInterval] = useState(null);
 
   // Constants for text limits
   const TEXT_LIMITS = {
@@ -96,6 +100,12 @@ const PdfViewer = () => {
 
     const handleScroll = () => {
       setShowButton(false);
+      // Only create timer if not already showing questions or results
+      if (!isTimerPaused && !showQuestions && !showResults && !autoSubmissionTimer) {
+        console.log('Setting up timer from scroll handler');
+        const timer = setInterval(handleAutoSubmission, 60 * 1000);
+        setAutoSubmissionTimer(timer);
+      }
     };
 
     // Use mouseup instead of click for better text selection handling
@@ -108,30 +118,85 @@ const PdfViewer = () => {
       document.removeEventListener('click', handleClick);
       document.removeEventListener('scroll', handleScroll);
     };
-  }, []);
+  }, [isTimerPaused, showQuestions, showResults, autoSubmissionTimer]); // Add dependencies
 
   useEffect(() => {
     // Set start time when component mounts
     setStartTime(Date.now());
   }, []);
 
+  // Add this effect to verify authentication on component mount
+  useEffect(() => {
+    // Validate token and user ID early
+    if (!token) {
+      console.error('No authentication token found');
+      toast.error('Please log in to continue');
+      navigate('/login');
+      return;
+    }
+    
+    // Verify userId exists from token
+    if (!userId) {
+      console.error('Invalid or expired token (no userId)');
+      toast.error('Your session has expired, please log in again');
+      localStorage.removeItem('token'); // Clear invalid token
+      navigate('/login');
+      return;
+    }
+  }, [token, userId, navigate]);
+
   const handleProcessText = async () => {
     try {
+      // Clear the autoSubmission timer when manually generating questions
+      if (autoSubmissionTimer) {
+        clearInterval(autoSubmissionTimer);
+        setAutoSubmissionTimer(null);
+      }
+      
+      // Set timer paused flag to prevent new auto-timers
+      setIsTimerPaused(true);
+      
+      // Get question config from location state or use default
+      const questionSettings = location.state?.questionConfig || {
+        numQuestions: 5,
+        difficulty: 'medium',
+        questionTypes: ['open-ended'],
+        timeLimit: 0
+      };
+
+      // Determine question type format for backend
+      const questionType = questionSettings.questionTypes.includes('mixed') ? 
+        'mix' : questionSettings.questionTypes.length > 1 ? 
+          'mix' : questionSettings.questionTypes[0];
+      
       const loadingToast = toast.loading('Generating questions...');
       
       const response = await axios.post('http://localhost:8000/api/assessment', {
         text: selectedText,
-        numQuestions: 5,
+        numQuestions: questionSettings.numQuestions,
         userId: userId,
         topic: 'General',
         subject: 'Knowledge',
-        type: 'General',
+        type: questionType,
+        difficulty: questionSettings.difficulty,
+        timeLimit: questionSettings.timeLimit
       });
+
+      if (!response.data.quizId) {
+        console.error('No quizId in API response:', response.data);
+        toast.error('Server error: Missing quiz information');
+        return;
+      }
       
       setQuestions(response.data.questions);
       setQuizId(response.data.quizId);
       setShowQuestions(true);
       toast.dismiss(loadingToast);
+      
+      // Start timer if a time limit is set
+      if (questionSettings.timeLimit > 0) {
+        startQuizTimer(questionSettings.timeLimit);
+      }
       
       // Clear selection and button
       window.getSelection().removeAllRanges();
@@ -150,9 +215,9 @@ const PdfViewer = () => {
                           'Failed to generate questions. Please try selecting a different portion of text.';
       
       toast.error(errorMessage, {
-        duration: 5000, // Show for 5 seconds
+        duration: 5000,
         style: {
-          maxWidth: '500px', // Allow longer error messages
+          maxWidth: '500px',
           padding: '16px',
           wordBreak: 'break-word'
         }
@@ -162,207 +227,246 @@ const PdfViewer = () => {
       window.getSelection().removeAllRanges();
       setShowButton(false);
       setSelectedText('');
+      
+      // Make sure to reset the timer paused state on error
+      setIsTimerPaused(false);
     }
   };
 
   // Function to get text content up to current scroll position
-  const getVisibleText = () => {
-    const pdfPages = document.querySelectorAll('.react-pdf__Page');
-    let visibleText = '';
-    const scrollPosition = window.scrollY + window.innerHeight;
-
-    // Debug log
-    console.log('Last read position:', lastReadPosition);
-
-    pdfPages.forEach((page) => {
-      const rect = page.getBoundingClientRect();
-      const pageBottom = rect.top + window.scrollY + rect.height;
-      
-      if (pageBottom <= scrollPosition) {
-        const textLayer = page.querySelector('.react-pdf__Page__textContent');
-        if (textLayer) {
-          const pageText = textLayer.textContent;
-          visibleText += pageText + ' ';
-        }
-      }
-    });
-
-    // Get only new content since last submission
-    const newContent = visibleText.slice(lastReadPosition).trim();
+  // Convert getVisibleText to a memoized function with useCallback
+const getVisibleText = useCallback(() => {
+  // Try multiple selector patterns to find text content in various PDF viewer implementations
+  const textLayerElements = document.querySelectorAll(
+    '.rpv-core__text-layer, .react-pdf__Page__textContent, .textLayer, .rpv-core__viewer-page-text-layer'
+  );
+  
+  console.log(`Found ${textLayerElements.length} text layer elements`);
+  
+  let allText = '';
+  const viewportHeight = window.innerHeight;
+  const scrollPosition = window.scrollY;
+  const visibleBottom = scrollPosition + viewportHeight;
+  
+  // Process all found text layers
+  textLayerElements.forEach((textLayer, index) => {
+    const rect = textLayer.getBoundingClientRect();
+    const elementTop = rect.top + scrollPosition;
+    const elementBottom = rect.bottom + scrollPosition;
     
-    // Debug logs
-    console.log('New content length:', newContent.length);
-    console.log('Content preview:', newContent.slice(0, 100) + '...');
+    // Only consider elements that have been scrolled past or are currently visible
+    if (elementBottom <= visibleBottom) {
+      const pageText = textLayer.textContent || '';
+      console.log(`Page ${index+1} text length: ${pageText.length} chars`);
+      allText += pageText + ' ';
+    }
+  });
+  
+  // Get only content after the last read position
+  const fullText = allText.trim();
+  console.log(`Total extracted text: ${fullText.length} chars`);
+  
+  // Calculate how much is new (after lastReadPosition)
+  let newContent = '';
+  if (fullText.length > lastReadPosition) {
+    newContent = fullText.slice(lastReadPosition).trim();
+    console.log(`New content detected: ${newContent.length} chars`);
+    
+    // Don't truncate - use all available content
+    // But still provide a preview in logs
+    if (newContent.length > 100) {
+      const preview = newContent.substring(0, 100);
+      console.log(`Content preview: ${preview}...`);
+    }
 
-    // If content is too large, take a chunk that makes sense (end at a period)
-    if (newContent.length > TEXT_LIMITS.MAX_CHARS) {
-      let truncatedContent = newContent.slice(0, TEXT_LIMITS.OPTIMAL_CHARS);
-      
-      // Find the last period to make a clean cut
-      const lastPeriodIndex = truncatedContent.lastIndexOf('.');
-      if (lastPeriodIndex > TEXT_LIMITS.MIN_CHARS) {
-        truncatedContent = truncatedContent.slice(0, lastPeriodIndex + 1);
-      }
+    // Basic validation - remove problematic characters
+    newContent = newContent.replace(/[^\x20-\x7E\n\r\t]/g, ' ');
 
-      console.log('Truncated content length:', truncatedContent.length);
-      return truncatedContent;
+    // Ensure content isn't just garbage characters
+    if (!/[a-zA-Z]{5,}/.test(newContent)) {
+      console.log('Content appears to be malformed, skipping');
+      return '';
     }
     
     return newContent;
-  };
+  } else {
+    console.log('No new content detected');
+    return '';
+  }
+}, [lastReadPosition]);
 
-  // Modified auto-submission handler
-  const handleAutoSubmission = useCallback(async () => {
-    const currentTime = Date.now();
-    const timeSinceLastSubmission = currentTime - lastSubmissionTime;
-    const FIVE_MINUTES = 0.5 * 60 * 1000;
+  // Replace your current handleAutoSubmission function with this fixed version:
+const handleAutoSubmission = useCallback(async () => {
+  // Don't run if timer should be paused
+  if (isTimerPaused || showQuestions || showResults) {
+    console.log('Auto-submission paused - questions or results are shown');
+    return;
+  }
+  
+  const currentTime = Date.now();
+  const timeSinceLastSubmission = currentTime - lastSubmissionTime;
+  const FIVE_MINUTES = 5 * 60 * 1000;
+  
+  console.log(`Time since last check: ${Math.round(timeSinceLastSubmission/1000)}s, Need: ${FIVE_MINUTES/1000}s`);
+  
+  if (timeSinceLastSubmission < FIVE_MINUTES) {
+    return; // Not time to check yet
+  }
+  
+  console.log('5 minutes passed, checking for new content...');
+  const newText = getVisibleText();
+  
+  // IMPORTANT: Set this immediately to prevent duplicate runs regardless of outcome
+  setLastSubmissionTime(currentTime);
+  
+  // Ensure we have enough text to generate meaningful questions
+  if (newText && newText.length >= TEXT_LIMITS.MIN_CHARS) {
+    try {
+      console.log(`Found ${newText.length} chars of new content - generating questions`);
+      
+      // Store toast reference properly
+      const loadingToastId = toast.loading('Auto-generating questions from your reading...');
+      
+      // Get question config from location state or use default
+      const questionSettings = location.state?.questionConfig || {
+        numQuestions: 5,
+        difficulty: 'medium',
+        questionTypes: ['open-ended'],
+        timeLimit: 0
+      };
 
-    if (timeSinceLastSubmission < FIVE_MINUTES) {
-      return;
-    }
-
-    const newText = getVisibleText();
-    
-    if (newText && 
-        newText.length >= TEXT_LIMITS.MIN_CHARS && 
-        newText.length <= TEXT_LIMITS.MAX_CHARS) {
-      try {
-        console.log('Submitting text of length:', newText.length);
-        
-        // Show loading toast for auto-submission
-        const loadingToast = toast.loading('Auto-generating questions from your reading...');
-        
-        setLastSubmissionTime(currentTime);
-        
-        const response = await axios.post('http://localhost:8000/api/assessment', {
-          text: newText,
-          numQuestions: 5,
-          userId: userId,
-          subject: 'Knowledge',
-          type: 'General',
-          topic: 'Fruit'
-        });
-        
-        // Dismiss loading toast on success
-        toast.dismiss(loadingToast);
-        toast.success('Questions generated from your reading!');
-        
-        setLastReadPosition(lastReadPosition + newText.length);
-        setQuestions(response.data.questions);
-        setQuizId(response.data.quizId);
-        setShowQuestions(true);
-        setIsTimerPaused(true);
-        
-        if (autoSubmissionTimer) {
-          clearInterval(autoSubmissionTimer);
-          setAutoSubmissionTimer(null);
-        }
-
-      } catch (error) {
-        console.error('Error in auto-submission:', error);
-        toast.error('Failed to generate questions from your reading. Will try again later.');
-        
-        // Reset timer and continue reading
-        setIsTimerPaused(false);
-        setLastSubmissionTime(currentTime - FIVE_MINUTES);
-        
-        if (autoSubmissionTimer) {
-          clearInterval(autoSubmissionTimer);
-        }
-        const timer = setInterval(handleAutoSubmission, 60 * 1000);
-        setAutoSubmissionTimer(timer);
-      }
-    } else {
-      console.log('Text not within limits:', {
-        length: newText.length,
-        minRequired: TEXT_LIMITS.MIN_CHARS,
-        maxAllowed: TEXT_LIMITS.MAX_CHARS
+      // Determine question type format for backend
+      const questionType = questionSettings.questionTypes.includes('mixed') ? 
+        'mix' : questionSettings.questionTypes.length > 1 ? 
+          'mix' : questionSettings.questionTypes[0];
+      
+      const response = await axios.post('http://localhost:8000/api/assessment', {
+        text: newText,
+        numQuestions: questionSettings.numQuestions,
+        userId: userId,
+        subject: 'Knowledge',
+        type: questionType,
+        difficulty: questionSettings.difficulty,
+        topic: 'Reading Comprehension',
+        timeLimit: questionSettings.timeLimit
       });
-    }
-  }, [lastReadPosition, userId]);
 
-  // Setup auto-submission timer with pause functionality
-  useEffect(() => {
-    if (!isTimerPaused) {
-      // Clear any existing timer
-      if (autoSubmissionTimer) {
-        clearInterval(autoSubmissionTimer);
+      if (!response.data.quizId) {
+        console.error('No quizId in API response:', response.data);
+        toast.error('Server error: Missing quiz information');
+        return;
       }
       
-      // Set new timer
-      const timer = setInterval(handleAutoSubmission, 60 * 1000); // Check every minute
-      setAutoSubmissionTimer(timer);
+      // Dismiss using the correct ID
+      toast.dismiss(loadingToastId);
+      
+      // Success path - update position and show questions
+      toast.success('Questions generated from your reading!');
+      
+      console.log(`Updating last read position from ${lastReadPosition} to ${lastReadPosition + newText.length}`);
+      setLastReadPosition(prevPos => prevPos + newText.length);
+      
+      setQuestions(response.data.questions);
+      setQuizId(response.data.quizId);
+      setShowQuestions(true);
+      setIsTimerPaused(true); // Pause timer while showing questions
 
-      return () => {
-        if (timer) {
-          clearInterval(timer);
-        }
-      };
-    }
-  }, [isTimerPaused, handleAutoSubmission]);
-
-  // Modified scroll handler
-  useEffect(() => {
-    const handleScroll = () => {
-      if (!isTimerPaused) {
-        // Don't reset timer on every scroll, just ensure one exists
-        if (!autoSubmissionTimer) {
-          const timer = setInterval(handleAutoSubmission, 60 * 1000);
-          setAutoSubmissionTimer(timer);
-        }
+      if (questionSettings.timeLimit > 0) {
+        startQuizTimer(questionSettings.timeLimit);
       }
-    };
+    } 
+    catch (error) {
+      console.error('Error in auto-submission:', error);
+      
+      // No need to dismiss a non-existent toast
+      toast.error('Failed to generate questions from your reading.');
+      
+      // Set a longer delay before next attempt on failure
+      // This prevents rapid consecutive failures
+      setLastSubmissionTime(currentTime);
+    }
+  } else {
+    console.log('Insufficient new content:', {
+      contentLength: newText?.length || 0,
+      minRequired: TEXT_LIMITS.MIN_CHARS,
+      maxAllowed: TEXT_LIMITS.MAX_CHARS
+    });
+  }
+}, [getVisibleText, lastReadPosition, userId, TEXT_LIMITS.MIN_CHARS, TEXT_LIMITS.MAX_CHARS, location.state, isTimerPaused, showQuestions, showResults]);
 
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [isTimerPaused, autoSubmissionTimer, userId]);
 
   // Resume timer when questions are closed
   const handleCloseQuestions = () => {
+  clearQuizTimer();
+  setShowQuestions(false);
+  setIsTimerPaused(false);  // Resume timer
+  
+  // Remove this manual timer creation - let the effect handle it
+  // if (!autoSubmissionTimer) {
+  //   const timer = setInterval(handleAutoSubmission, 60 * 1000);
+  //   setAutoSubmissionTimer(timer);
+  // }
+};
+
+  // Clear timer function
+const clearQuizTimer = useCallback(() => {
+  if (quizTimerInterval) {
+    clearInterval(quizTimerInterval);
+    setQuizTimerInterval(null);
+  }
+  setQuizEndTime(null);
+  setRemainingTime(null);
+}, [quizTimerInterval]);
+
+  // Modified submit handler with useCallback and debugging
+const handleSubmitAnswers = useCallback(async (isTimeUp = false) => {
+  console.log('Submitting answers with:', { quizId, userId, questionsCount: questions.length });
+  
+  if (!quizId) {
+    console.error('Missing quiz ID');
+    toast.error("Missing quiz ID. Please try again.");
+    return;
+  }
+  
+  if (!userId) {
+    console.error('Missing user ID');
+    toast.error("Missing user ID. Please try again.");
+    return;
+  }
+
+  const toastId = toast.loading(isTimeUp ? "Time's up! Submitting answers..." : "Submitting answers...");
+
+  try {
+    // Clear the quiz timer
+    clearQuizTimer();
+
+    // Calculate time taken in seconds
+    const timeTaken = Math.floor((Date.now() - startTime) / 1000);
+    
+    // Convert answers object to use questionId keys
+    const formattedAnswers = {};
+    questions.forEach((question, index) => {
+      if (answers[index]) {
+        formattedAnswers[index] = answers[index];
+      }
+    });
+
+    const response = await axios.post(`http://localhost:8000/api/assessment/${quizId}/submit`, {
+      answers: formattedAnswers,
+      userId: userId,
+      timeTaken: timeTaken,
+    });
+
+    toast.dismiss(toastId);
+    setEvaluationResults(response.data);
     setShowQuestions(false);
-    setIsTimerPaused(false);  // Resume timer
-  };
-
-  // Modified submit handler
-  const handleSubmitAnswers = async () => {
-    if (!quizId || !userId) {
-      toast.error("Missing quiz ID or user ID. Please try again.");
-      return;
-    }
-
-    const toastId = toast.loading("Submitting answers...");
-
-    try {
-
-      // Calculate time taken in seconds
-      const timeTaken = Math.floor((Date.now() - startTime) / 1000);
-      
-      // Convert answers object to use questionId keys
-      const formattedAnswers = {};
-      questions.forEach((question, index) => {
-        if (answers[index]) {
-          formattedAnswers[index] = answers[index];
-        }
-      });
-      console.log(formattedAnswers);
-
-      const response = await axios.post(`http://localhost:8000/api/assessment/${quizId}/submit`, {
-        answers: formattedAnswers,
-        userId: userId,
-        timeTaken: timeTaken,
-      });
-
-      toast.dismiss(toastId);
-      setEvaluationResults(response.data);
-      setShowQuestions(false);
-      setShowResults(true);
-      // Don't resume timer yet - wait until results are closed
-    } catch (error) {
-      toast.dismiss(toastId);
-      console.error('Error submitting answers:', error);
-      alert('Failed to submit answers. Please try again.');
-    }
-  };
+    setShowResults(true);
+  } catch (error) {
+    toast.dismiss(toastId);
+    console.error('Error submitting answers:', error);
+    toast.error('Failed to submit answers. Please try again.');
+  }
+}, [quizId, userId, questions, answers, startTime, clearQuizTimer]);
 
   // Resume timer when results are closed
   const handleCloseResults = () => {
@@ -438,6 +542,93 @@ const PdfViewer = () => {
     }
   }, [buttonPosition.y, evaluationResults, pdfData, savedMarkers]);
 
+  // Delete ALL other timer-related useEffect hooks and keep only this consolidated one
+useEffect(() => {
+  // Clear any existing timer first
+  if (autoSubmissionTimer) {
+    console.log('Clearing existing timer');
+    clearInterval(autoSubmissionTimer);
+    setAutoSubmissionTimer(null);
+  }
+
+  // Only set up a new timer if not paused AND not showing questions/results
+  if (!isTimerPaused && !showQuestions && !showResults) {
+    console.log('Setting up single auto-submission timer - checks every 60 seconds');
+    
+    const timer = setInterval(handleAutoSubmission, 60 * 1000);
+    setAutoSubmissionTimer(timer);
+    
+    return () => {
+      console.log('Cleaning up timer on unmount');
+      clearInterval(timer);
+    };
+  }
+  
+  return undefined; // Empty cleanup when no timer is created
+}, [isTimerPaused, showQuestions, showResults, handleAutoSubmission]); // Add showQuestions and showResults
+
+// Format remaining time as mm:ss
+const formatTime = (ms) => {
+  if (!ms) return "--:--";
+  const totalSeconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+};
+
+// Start quiz timer function with fixed dependencies
+const startQuizTimer = useCallback((timeLimit) => {
+  // Clear any existing timer
+  if (quizTimerInterval) {
+    clearInterval(quizTimerInterval);
+  }
+  
+  // Calculate end time based on current time plus time limit
+  const endTime = Date.now() + (timeLimit * 60 * 1000);
+  setQuizEndTime(endTime);
+  
+  // Create interval to update the timer display
+  const timerInterval = setInterval(() => {
+    const now = Date.now();
+    const timeLeft = endTime - now;
+    
+    // Update the displayed time
+    setRemainingTime(timeLeft);
+    
+    // Auto-submit when time runs out
+    if (timeLeft <= 0) {
+      clearInterval(timerInterval);
+      setRemainingTime(0);
+      
+      // Check if we have what we need to submit
+      if (!quizId || !userId) {
+        console.error("Timer expired but missing quizId or userId", {quizId, userId});
+        toast.error("Can't submit: Missing quiz ID or user ID");
+        return;
+      }
+      
+      handleSubmitAnswers(true); // Pass true to indicate time's up
+    }
+  }, 1000);
+  
+  setQuizTimerInterval(timerInterval);
+}, [handleSubmitAnswers, quizId, userId, quizTimerInterval]);
+
+
+
+// Clean up timers on unmount
+useEffect(() => {
+  return () => {
+    if (quizTimerInterval) {
+      clearInterval(quizTimerInterval);
+    }
+    if (autoSubmissionTimer) {
+      clearInterval(autoSubmissionTimer);
+    }
+  };
+}, [quizTimerInterval, autoSubmissionTimer]);
+
+
   return (
     <div className="min-h-screen bg-gray-100 p-8">
       {/* Add Toaster component */}
@@ -481,7 +672,16 @@ const PdfViewer = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 p-6">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-semibold text-gray-800">Generated Questions</h2>
+              <div className="flex items-center">
+                <h2 className="text-xl font-semibold text-gray-800 mr-4">Generated Questions</h2>
+                {remainingTime !== null && (
+                  <div className={`px-3 py-1 rounded-full font-mono ${
+                    remainingTime < 60000 ? 'bg-red-100 text-red-800 animate-pulse' : 'bg-blue-100 text-blue-800'
+                  }`}>
+                    Time: {formatTime(remainingTime)}
+                  </div>
+                )}
+              </div>
               <button 
                 onClick={handleCloseQuestions}
                 className="text-gray-500 hover:text-gray-700 transition-colors"
@@ -709,7 +909,7 @@ const PdfViewer = () => {
           </div>
 
           {/* PDF Viewer */}
-          <Worker workerUrl="https://unpkg.com/pdfjs-dist@3.4.120/build/pdf.worker.min.js">
+          <Worker workerUrl="https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js">
             <Viewer
               fileUrl={pdfData}
               plugins={[

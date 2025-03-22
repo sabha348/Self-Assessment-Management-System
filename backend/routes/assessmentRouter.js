@@ -1,10 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const { runPythonProcess } = require('../utils/pythonRunner');
-const Question = require('../models/question'); // Corrected case sensitivity
+const Question = require('../models/Question'); // Corrected case sensitivity
 const Quiz = require('../models/Quiz');
 const UserAnswer = require('../models/UserAnswer');
 const mongoose = require('mongoose');
+// Import the text categorizer
+const { categorizeText } = require('../utils/TextCategory');
 
 // let correct_answers = [];
 // let questionsArray = [];
@@ -31,46 +33,92 @@ async function saveQuestions(Formatted_questions, prefix = 'Q') {
 // Initiate assessment route
 router.post("/", async (req, res) => {
   try {
-    const { text, numQuestions = 5, userId } = req.body;
+    const { 
+      text, 
+      numQuestions = 5, 
+      userId,
+      difficulty = 'medium',
+      type = 'open-ended',
+      timeLimit = 0,
+      topic = 'General',
+      subject = 'Knowledge'
+    } = req.body;
 
     if (!text || typeof text !== 'string') {
       return res.status(400).json({ error: "Valid text input is required" });
     }
 
+    // First create a Quiz with the provided values
+    let quizId, questionsArray;
     try {
-      // First create a Quiz
       const quiz = new Quiz({
         numberOfQuestions: numQuestions,
         createdBy: userId,
-        difficulty: 'medium',
-        type: 'open-ended',
-        topic: 'General',
+        difficulty: difficulty,
+        type: type,
+        topic: topic,
         content: text.substring(0, 1000), // Store a preview of the content
-        subject: 'Knowledge',
-        quizTime: 30, // Default time limit in minutes
+        subject: subject,
+        quizTime: timeLimit || 30, // Use provided timeLimit or default
       });
 
       const savedQuiz = await quiz.save();
-      const quizId = savedQuiz._id; // Get the quiz ID
+      quizId = savedQuiz._id;
+
+      // Pass these parameters to the Python script for better question generation
+      const extraParams = [];
+      if (difficulty && difficulty !== 'medium') {
+        extraParams.push('--difficulty', difficulty);
+      }
+      if (type && type !== 'open-ended') {
+        extraParams.push('--type', type);
+      }
 
       // Clean text and generate questions
       const cleanText = text.replace(/\r?\n/g, ' ').trim();
+      
+      const questions = await runPythonProcess("./python_scripts/questions.py", [
+        cleanText,
+        numQuestions.toString(),
+        ...extraParams
+      ]);
+
+      if (!Array.isArray(questions)) {
+        throw new Error("Invalid questions format received");
+      }
+
+      // Clean questions array and ensure proper formatting
+      questionsArray = questions.map(q => {
+        // Remove any leading/trailing quotes, dashes, and whitespace
+        return q.replace(/^["\s-]+|["\s]+$/g, '').trim();
+      });
+
+      // Categorize the text content
+      console.log("Categorizing text content...");
+      const categories = await categorizeText(cleanText);
+      
+      // Update the quiz with category information
+      await Quiz.findByIdAndUpdate(quizId, {
+        subject: categories.Subject,
+        topic: categories.Topic,
+        subtopic: categories.Subtopic,
+        concept: categories.Concept
+      });
+
+      console.log('questionsinitial:',questionsArray);
+      
+      // Include categories in the response
+      res.json({ 
+        quizId,
+        questions: questionsArray,
+        categories: categories
+      });
+
+      // After sending response, continue with background processing
+      console.log("Generating correct answers in the background...");
+      
+      // Background processing wrapped in its own try/catch
       try {
-        const questions = await runPythonProcess("./python_scripts/questions.py", [
-          cleanText,
-          numQuestions.toString()
-        ]);
-
-        if (!Array.isArray(questions)) {
-          throw new Error("Invalid questions format received");
-        }
-
-        // Clean questions array and ensure proper formatting
-        const questionsArray = questions.map(q => {
-          // Remove any leading/trailing quotes, dashes, and whitespace
-          return q.replace(/^["\s-]+|["\s]+$/g, '').trim();
-        });
-
         // Generate correct answers with cleaned data
         const correctAnswers = await runPythonProcess("./python_scripts/correct_answers.py", [
           cleanText,
@@ -86,44 +134,55 @@ router.post("/", async (req, res) => {
           typeof a === 'string' ? a.trim() : String(a)
         );
 
-        // Save questions with quiz reference
+        // Save questions with quiz reference and updated categories
+        const savePromises = [];
         for (let i = 0; i < questionsArray.length; i++) {
           const newQuestion = new Question({
             questionId: `Q${Date.now()}${i}`,
-            quizeRef: quizId, // Add the quiz reference here
+            quizeRef: quizId,
             question: questionsArray[i],
             correctAnswer: cleanedCorrectAnswers[i],
             userId: userId,
-            type: 'open-ended'
+            type: quiz.type,
+            // These will be automatically populated by our middleware if missing
+            subject: quiz.subject,
+            topic: quiz.topic,
+            subtopic: quiz.subtopic,
+            concept: quiz.concept,
+            difficulty: quiz.difficulty
           });
-          await newQuestion.save();
+          savePromises.push(newQuestion.save());
         }
 
-        res.json({ 
-          quizId,
-          questions: questionsArray 
-        });
+        await Promise.all(savePromises);
+        console.log("Background processing completed successfully");
+      } catch (bgError) {
+        // Just log errors in background processing, don't crash
+        console.error('Background processing error:', bgError);
+        
+        // If needed, update quiz status to indicate an error
+        await Quiz.findByIdAndUpdate(quizId, { status: 'error' });
+      }
 
-      } catch (error) {
-        console.error('Processing error:', error);
+    } catch (error) {
+      console.error('Processing error:', error);
+      // Only send error response if we haven't already sent a response
+      if (!res.headersSent) {
         res.status(500).json({
           error: "Failed to process text",
           details: error.message
         });
       }
-    } catch (error) {
-      console.error('Router error:', error);
+    }
+  } catch (error) {
+    console.error('Router error:', error);
+    // Only send error response if we haven't already sent a response
+    if (!res.headersSent) {
       res.status(500).json({
         error: "Server error",
         details: error.message
       });
     }
-  } catch (error) {
-    console.error('Router error:', error);
-    res.status(500).json({
-      error: "Server error",
-      details: error.message
-    });
   }
 });
 
@@ -133,12 +192,11 @@ router.post("/:quizId/submit", async (req, res) => {
   try {
     const { quizId } = req.params;
     const { answers, userId, timeTaken } = req.body;
+    console.log('answers:', answers);
 
     if (!quizId || !answers || !userId) {
       return res.status(400).json({ error: "Quiz ID, answers, and user ID are required" });
     }
-
-    console.log(answers);
     
     // Convert answers object to array format
     const answersArray = Object.values(answers);
@@ -149,14 +207,17 @@ router.post("/:quizId/submit", async (req, res) => {
       return res.status(404).json({ error: "Quiz not found" });
     }
     // Fetch questions for the quiz
-    const questions = await Question.find({ quizRef: quiz.quizId });
+    const questions = await Question.find({ quizeRef: quizId });
     if (!questions || !questions.length) {
       return res.status(404).json({ error: "Questions not found for the quiz" });
     }
+
+    console.log('questions:',questions);
      // Format data for evaluation
      let questionsData = [];
      let userAnswersData = [];
      let correctAnswersData = [];
+
 
     questions.forEach((question, index) => {
       // const questionId = q.questionId;
@@ -167,13 +228,13 @@ router.post("/:quizId/submit", async (req, res) => {
       }
     });        
 
-    console.log(questionsData);
     
     // Prepare evaluation data
     const evalData = {
       answers: userAnswersData,
       correct_answers: correctAnswersData
     };
+    console.log('evaldata:',evalData);
 
     try {
       const results = await runPythonProcess("./python_scripts/evaluate_answers.py", [

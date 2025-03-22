@@ -20,6 +20,8 @@ function sanitizeArgs(args) {
 
 function runPythonProcess(scriptPath, args) {
   return new Promise((resolve, reject) => {
+    console.log('Running Python script:', scriptPath);
+    console.log('Raw arguments:', args);
     const pythonProcess = spawn('python', [scriptPath, ...args]);
     let dataString = '';
     let errorString = '';

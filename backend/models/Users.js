@@ -13,6 +13,14 @@ const userSchema = new mongoose.Schema({
     default: 'free' 
   },
   createdAt: { type: Date, default: Date.now },
+  preferences: {
+    questionConfig: {
+      numQuestions: { type: Number, default: 5 },
+      difficulty: { type: String, default: 'medium' },
+      questionTypes: [{ type: String }],
+      timeLimit: { type: Number, default: 0 }
+    }
+  }
 });
 
 module.exports = mongoose.model('User', userSchema);
