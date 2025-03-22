@@ -164,8 +164,8 @@ const Dashboard = () => {
           </div>
         </div>
         
-        {/* Upload PDF Icon with Tooltip */}
-        <div className="relative group">
+        {/* Comment out Upload PDF Icon with Tooltip */}
+        {/* <div className="relative group">
           <div 
             className="p-2 rounded-lg hover:bg-gray-100 cursor-pointer"
             onClick={handlePlusClick}
@@ -173,20 +173,18 @@ const Dashboard = () => {
             <Plus className="w-6 h-6 text-gray-600" />
           </div>
           
-          {/* Tooltip */}
           <div className="absolute left-full ml-2 hidden group-hover:flex items-center">
             <div className="bg-black text-white text-sm py-1 px-2 rounded whitespace-nowrap">
               Upload pdf
             </div>
-            {/* Arrow */}
             <div className="absolute left-0 transform -translate-x-1 w-2 h-2 bg-black rotate-45"></div>
           </div>
-        </div>
+        </div> */}
 
-        {/* Pro Badge */}
-        <div className="mt-auto p-2 bg-black text-white rounded-lg">
+        {/* Comment out Pro Badge */}
+        {/* <div className="mt-auto p-2 bg-black text-white rounded-lg">
           Pro
-        </div>
+        </div> */}
         
         {/* Use ProfileMenu component instead of direct logout */}
         <ProfileMenu />
@@ -231,12 +229,12 @@ const Dashboard = () => {
         <div className="mt-8">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold">Timetable</h2>
-            <button 
+            {/* <button 
               className="p-2 hover:bg-gray-100 rounded-full"
               onClick={() => navigate('/entry')}
             >
               <Plus className="w-5 h-5 text-gray-600" />
-            </button>
+            </button> */}
           </div>
           
           {/* Keeping the existing timetable with API data */}

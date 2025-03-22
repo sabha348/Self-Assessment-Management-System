@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
+import { uploadFile } from '../services/fileService';
 import axios from 'axios';
 import { toast, ToastContainer } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
+import { User } from 'lucide-react';
 import 'react-toastify/dist/ReactToastify.css';
 
 // Import Material UI components
@@ -21,11 +23,16 @@ import TimeIcon from '@mui/icons-material/AccessTime';
 import DateIcon from '@mui/icons-material/DateRange';
 
 const FilesList = () => {
+  const fileInputRef = useRef(null);
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [configDialogOpen, setConfigDialogOpen] = useState(false);
   const navigate = useNavigate();
+
+  const handleUpload = () => {
+    fileInputRef.current.click();
+  };
 
   // Get token from localStorage
   const token = localStorage.getItem('token');
@@ -137,6 +144,42 @@ const FilesList = () => {
     setConfigDialogOpen(false);
   };
 
+  const handleFileChange = async (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      // Check file size (50MB limit)
+      const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB in bytes
+      
+      if (file.size > MAX_FILE_SIZE) {
+        toast.error('File size exceeds 50MB limit');
+        return;
+      }
+
+      let loadingToast;
+      try {
+        // Show loading toast
+        loadingToast = toast.loading('Uploading file...');
+        
+        const response = await uploadFile(file);
+        
+        // Dismiss loading toast and show success
+        toast.dismiss(loadingToast);
+        toast.success('File uploaded successfully');
+        
+        // Navigate to PDF viewer with the data
+        navigate('/pdf-viewer', {
+          state: {
+            pdfData: `data:application/pdf;base64,${response.content}`,
+            title: file.name
+          }
+        });
+      } catch (error) {
+        toast.dismiss(loadingToast);
+        toast.error('Failed to upload file: ' + (error.message || 'Unknown error'));
+      }
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-100 p-8 flex justify-center items-center">
@@ -158,6 +201,15 @@ const FilesList = () => {
 
   return (
     <div className="min-h-screen bg-gray-100 p-8">
+      {/* Hidden file input */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        className="hidden"
+        accept=".pdf"
+      />
+
       <ToastContainer position="top-right" autoClose={3000} />
       
       <div className="max-w-6xl mx-auto">
@@ -165,7 +217,7 @@ const FilesList = () => {
           <h1 className="text-2xl font-bold">My Documents</h1>
           <div className="flex gap-3">
             <button 
-              onClick={() => navigate('/upload')}
+              onClick={handleUpload}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
             >
               Upload New
@@ -188,7 +240,7 @@ const FilesList = () => {
             <h2 className="text-xl font-semibold text-gray-600 mb-2">No files yet</h2>
             <p className="text-gray-500 mb-6">Upload a PDF document to generate questions and assessments</p>
             <button 
-              onClick={() => navigate('/upload')}
+              onClick={handleUpload}
               className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
             >
               Upload Your First Document

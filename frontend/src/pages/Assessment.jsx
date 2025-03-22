@@ -144,7 +144,7 @@ const Assessment = () => {
       });
       
       setResults({
-        score: response.data.totalScore * 100, // Convert to percentage
+        score: (response.data.totalScore / questions.length) * 100, // Properly calculate percentage
         evaluations: response.data.evaluations,
         correctAnswers: response.data.evaluations.filter(e => e.status === "correct").length,
         totalQuestions: questions.length
