@@ -604,11 +604,11 @@ const SkillAnalysis = () => {
       
       <Typography variant="h5" sx={{ mb: 3 }}>{getCurrentLevelLabel()}</Typography>
       
-      <Tabs value={activeTab} onChange={handleTabChange} sx={{ mb: 3 }}>
+      {/* <Tabs value={activeTab} onChange={handleTabChange} sx={{ mb: 3 }}>
         <Tab label="Overview" />
         <Tab label="Proficiency Analysis" />
         <Tab label="Improvement Plan" />
-      </Tabs>
+      </Tabs> */}
       
       {loading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>

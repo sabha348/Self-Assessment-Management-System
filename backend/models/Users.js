@@ -12,6 +12,9 @@ const userSchema = new mongoose.Schema({
     enum: ['free', 'premium'], 
     default: 'free' 
   },
+  membershipExpiry: Date, //  Store expiry date for paid plans 
+  stripeCustomerId: { type: String }, // Store Stripe customer ID
+  stripePaymentId: { type: String }, // Store Stripe payment ID for one-time purchase
   createdAt: { type: Date, default: Date.now },
   preferences: {
     questionConfig: {

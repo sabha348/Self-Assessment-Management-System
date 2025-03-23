@@ -1373,7 +1373,7 @@ const handleDelete = async (item, level, parentItem) => {
         )}
         
         {/* Recommended Items Section */}
-        {!selectedSubject && !loading && recommendedItems.length > 0 && (
+        {selectedSubject && !loading && recommendedItems.length > 0 && (
           <Box sx={{ mt: 6 }}>
             <Typography variant="h5" sx={{ mb: 3, fontWeight: 700 }}>Recommended for You</Typography>
             <Grid2 container spacing={3}>

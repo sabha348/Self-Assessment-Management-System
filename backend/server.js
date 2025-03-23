@@ -11,6 +11,9 @@ const loginUser = require('./authentication/login');
 const { upload, uploadFile, getFiles } = require('./services/fileService');
 const quizRouter = require('./routes/quizRouter');
 const mongoose = require('mongoose');
+// const upgradeMembership = require('./routes/membership');
+const paymentRoutes = require('./routes/paymentRouter'); 
+
 
 const app = express();
 const port = process.env.PORT || 8000; // Changed port to 8000
@@ -25,6 +28,12 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
+// app.use(cors({
+//   origin: "http://localhost:3000", // Replace with your frontend URL
+//   methods: "GET,POST,PUT, DELETE, OPTIONS",
+//   credentials: true
+// }));
+
 app.use(bodyParser.json());
 // Update body-parser configuration with increased limits
 app.use(express.json({ limit: '100mb' })); // Increased from 50mb to 100mb
@@ -38,6 +47,9 @@ app.use('/user', userRoutes);
 app.use('/api/files', fileRoutes);
 app.use('/api/timetable', timetableRoutes); // Keeping this existing route
 app.use('/api/quizzes', quizRouter); // Added new quiz router
+app.use('/api/payment',paymentRoutes);
+
+// app.use('/api/membership/upgrade',upgradeMembership);
 
 // Test route
 app.get('/api/test', (req, res) => {

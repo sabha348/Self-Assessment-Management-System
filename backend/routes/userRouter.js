@@ -323,4 +323,13 @@ router.delete('/:id', authenticateToken, authorizeRole('admin'), userController.
 // Route to delete all users (Highly restricted - Admin only)
 router.delete('/', authenticateToken, authorizeRole('admin'), userController.deleteAllUsers);
 
+
+router.get("/me", authenticateToken, async (req, res) => {
+  try {
+      res.json(req.user); // Returns decoded user info (userId, role, membership)
+  } catch (error) {
+      res.status(500).json({ message: "Server Error" });
+  }
+});
+
 module.exports = router;

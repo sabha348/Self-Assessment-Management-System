@@ -14,6 +14,8 @@
     "@react-pdf-viewer/default-layout": "^3.12.0",
     "@react-pdf-viewer/thumbnail": "^3.12.0",
     "@reduxjs/toolkit": "^2.5.1",
+    "@stripe/react-stripe-js": "^3.5.1",
+    "@stripe/stripe-js": "^6.1.0",
     "@syncfusion/ej2-base": "^28.2.5",
     "@syncfusion/ej2-react-buttons": "^28.2.7",
     "@syncfusion/ej2-react-pdfviewer": "^28.2.7",
