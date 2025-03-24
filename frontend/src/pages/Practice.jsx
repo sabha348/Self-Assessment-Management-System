@@ -36,8 +36,9 @@ import {
   FormControlLabel,
   Checkbox,
   Switch,
-  TextField
+  TextField,
 } from '@mui/material';
+
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import CloseIcon from '@mui/icons-material/Close';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -727,6 +728,15 @@ const handleDelete = async (item, level, parentItem) => {
           aria-label="breadcrumb" 
           sx={{ mb: 3, bgcolor: 'white', p: 2, borderRadius: 2, boxShadow: 1 }}
         >
+
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={() => navigate('/dashboard')} // Navigate to /dashboard
+          sx={{ mr: 2 }}
+        >
+          Go to Dashboard
+        </Button>
           <MuiLink
             component="button"
             onClick={() => handleNavigationBack()}
