@@ -443,7 +443,7 @@ const FilesList = () => {
             />
 
             {/* Other question types (Disabled for Free Users) */}
-            <FormControlLabel
+            {/* <FormControlLabel
               control={
                 <Checkbox 
                   checked={questionConfig.questionTypes.includes('mcq')}
@@ -486,8 +486,8 @@ const FilesList = () => {
                 />
               }
               label="Mixed (All Types)"
-            />
-          </FormGroup> */}
+            /> */}
+          </FormGroup> 
         </DialogContent>
 
         

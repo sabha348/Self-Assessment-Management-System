@@ -782,7 +782,7 @@ const handleDelete = async (item, level, parentItem) => {
         </Breadcrumbs>
 
         {/* Back to Dashboard button - only show at subjects level */}
-        {!selectedSubject && (
+        {/* {!selectedSubject && (
           <Box sx={{ mb: 3 }}>
             <Button
               startIcon={<ArrowBackIcon />}
@@ -793,7 +793,7 @@ const handleDelete = async (item, level, parentItem) => {
               Back to Dashboard
             </Button>
           </Box>
-        )}
+        )} */}
 
         {/* Header Section */}
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 4 }}>
@@ -1053,7 +1053,7 @@ const handleDelete = async (item, level, parentItem) => {
                     >
                       Practice
                     </Button>
-                    <Button 
+                    {/* <Button 
                       size="small"
                       color="error"
                       startIcon={<DeleteIcon />}
@@ -1064,7 +1064,7 @@ const handleDelete = async (item, level, parentItem) => {
                       sx={{ ml: 1 }}
                     >
                       Delete
-                    </Button>
+                    </Button> */}
                   </Box>
                 </CardActions>
               </StyledCard>

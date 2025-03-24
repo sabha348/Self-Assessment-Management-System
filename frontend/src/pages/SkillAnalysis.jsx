@@ -21,7 +21,6 @@ import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import TrendingDownIcon from '@mui/icons-material/TrendingDown';
 import InfoIcon from '@mui/icons-material/Info';
 import axios from 'axios';
-import { jwtDecode } from 'jwt-decode';
 
 const SkillAnalysis = () => {
   const navigate = useNavigate(); // Add this hook to enable navigation
@@ -1229,7 +1228,7 @@ const handleStartAssessment = (item) => {
       
       <Typography variant="h5" sx={{ mb: 3 }}>{getCurrentLevelLabel()}</Typography>
       
-      {/* <Tabs value={activeTab} onChange={handleTabChange} sx={{ mb: 3 }}>
+       <Tabs value={activeTab} onChange={handleTabChange} sx={{ mb: 3 }}>
         <Tab label="Overview" />
         {/* <Tab label="Proficiency Analysis" />
         <Tab label="Improvement Plan" /> */}
