@@ -30,7 +30,7 @@ import Assessment from './pages/Assessment';
 import SkillAnalysis from './pages/SkillAnalysis';
 import { Elements } from '@stripe/react-stripe-js';
 import PaymentSuccess from './pages/PaymentSuccess';
-import Checkout from './components/Checkout';
+import ProUpgradeModal from './pages/ProUpgradeModal';
 
 // MUI Theme Configuration
 const theme = createTheme({
@@ -74,6 +74,11 @@ function App() {
                     //  </PrivateRoute>
                   } 
                 />
+
+                  <Route path="/upgradepro" element={<ProUpgradeModal />} />
+
+                
+                
                 
                 {/* Files and Resource Routes */}
                 <Route path="/files" element={<FilesList />} />
@@ -101,7 +106,6 @@ function App() {
                 />
 
                   {/* Stripe  */}
-                  <Route path="/checkout" element={<Checkout />} />
                   <Route path="/payment-success" element={<PaymentSuccess />} />
                 
                 {/* Default Route */}

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom'; // Add this import for navigation
+import { useNavigate,useLocation } from 'react-router-dom'; // Add this import for navigation
+import { jwtDecode } from "jwt-decode";
 import { 
   Container, Grid, Paper, Typography, Box, 
   Tabs, Tab, Divider, CircularProgress, Alert,
@@ -23,6 +24,8 @@ import axios from 'axios';
 
 const SkillAnalysis = () => {
   const navigate = useNavigate(); // Add this hook to enable navigation
+  const location = useLocation();
+  const [currentUser, setCurrentUser] = useState(null);
   
   // Tab state
   const [activeTab, setActiveTab] = useState(0);
@@ -59,6 +62,46 @@ const SkillAnalysis = () => {
     BASIC: { color: '#FF9800', label: 'Basic', range: [40, 54] },
     NEEDS_WORK: { color: '#F44336', label: 'Needs Work', range: [0, 39] }
   };
+
+
+  useEffect(() => {
+        const fetchUser = async () => {
+          try {
+            const token = localStorage.getItem("token");
+            if (!token) {
+              navigate("/login");
+              return;
+            }
+    
+            
+            // Decode token to get user ID
+            const decoded = jwtDecode(token);
+            const userId = decoded.userId;
+    
+            // Fetch the latest user data from backend
+            const response = await axios.get(`http://localhost:8000/user/${userId}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+    
+    
+            if (!response) {
+              throw new Error("Failed to fetch user data");
+            }
+    
+            const userData = await response.data;
+            console.log(userData);
+            setCurrentUser(userData); // Update state with fresh data
+            if(userData.membership !== "premium") {
+              navigate("/dashboard");
+            }
+  
+          } catch (error) {
+            console.error("Fetching user error:", error);
+          }
+        };
+    
+        fetchUser();
+      }, [location.pathname]);
 
   // Get proficiency level based on score
   const getProficiencyLevel = (score) => {

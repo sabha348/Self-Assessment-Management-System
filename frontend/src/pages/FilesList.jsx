@@ -2,9 +2,10 @@ import React, { useRef, useState, useEffect } from 'react';
 import { uploadFile } from '../services/fileService';
 import axios from 'axios';
 import { toast, ToastContainer } from 'react-toastify';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate,useLocation } from 'react-router-dom';
 import { User } from 'lucide-react';
 import 'react-toastify/dist/ReactToastify.css';
+import { jwtDecode } from "jwt-decode";
 
 // Import Material UI components
 import { 
@@ -23,12 +24,14 @@ import TimeIcon from '@mui/icons-material/AccessTime';
 import DateIcon from '@mui/icons-material/DateRange';
 
 const FilesList = () => {
+  const location = useLocation();
   const fileInputRef = useRef(null);
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [configDialogOpen, setConfigDialogOpen] = useState(false);
   const navigate = useNavigate();
+  const [currentUser, setCurrentUser] = useState(null);
 
   const handleUpload = () => {
     fileInputRef.current.click();
@@ -36,6 +39,42 @@ const FilesList = () => {
 
   // Get token from localStorage
   const token = localStorage.getItem('token');
+
+    useEffect(() => {
+      const fetchUser = async () => {
+        try {
+          const token = localStorage.getItem("token");
+          if (!token) {
+            navigate("/login");
+            return;
+          }
+  
+          
+          // Decode token to get user ID
+          const decoded = jwtDecode(token);
+          const userId = decoded.userId;
+  
+          // Fetch the latest user data from backend
+          const response = await axios.get(`http://localhost:8000/user/${userId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+  
+  
+          if (!response) {
+            throw new Error("Failed to fetch user data");
+          }
+  
+          const userData = await response.data;
+          // console.log(userData);
+          setCurrentUser(userData); // Update state with fresh data
+        } catch (error) {
+          console.error("Fetching user error:", error);
+        }
+      };
+  
+      fetchUser();
+    }, [location.pathname]);
+  
 
   // Question generation configuration state
   const [questionConfig, setQuestionConfig] = useState(() => {
@@ -327,11 +366,13 @@ const FilesList = () => {
         </DialogTitle>
         
         <DialogContent dividers>
+          {/* Number of Questions */}
           <FormControl fullWidth margin="normal">
             <InputLabel>Number of Questions</InputLabel>
             <Select
               value={questionConfig.numQuestions}
               onChange={(e) => setQuestionConfig({...questionConfig, numQuestions: e.target.value})}
+              disabled={currentUser.membership === 'free'} // Disable selection for free users
             >
               <MenuItem value={3}>3 questions</MenuItem>
               <MenuItem value={5}>5 questions</MenuItem>
@@ -339,12 +380,14 @@ const FilesList = () => {
               <MenuItem value={10}>10 questions</MenuItem>
             </Select>
           </FormControl>
-          
+
+          {/* Difficulty Selection */}
           <FormControl fullWidth margin="normal">
             <InputLabel>Difficulty</InputLabel>
             <Select
-              value={questionConfig.difficulty}
+              value={currentUser.membership === 'free' ? 'medium' : questionConfig.difficulty}
               onChange={(e) => setQuestionConfig({...questionConfig, difficulty: e.target.value})}
+              disabled={currentUser.membership === 'free'} // Restrict free users
             >
               <MenuItem value="easy">Easy</MenuItem>
               <MenuItem value="medium">Medium</MenuItem>
@@ -352,7 +395,8 @@ const FilesList = () => {
               <MenuItem value="mixed">Mixed</MenuItem>
             </Select>
           </FormControl>
-          
+
+          {/* Time Limit */}
           <FormControl fullWidth margin="normal">
             <InputLabel>Time Limit</InputLabel>
             <Select
@@ -366,17 +410,19 @@ const FilesList = () => {
               <MenuItem value={30}>30 minutes</MenuItem>
             </Select>
           </FormControl>
-          
+
           <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>
             Question Types
           </Typography>
-          
+
           <FormGroup>
+            {/* Open-Ended (Always Selected for Free Users) */}
             <FormControlLabel
               control={
                 <Checkbox 
-                  checked={questionConfig.questionTypes.includes('open-ended')} 
+                  checked={questionConfig.questionTypes.includes('open-ended')}
                   onChange={(e) => {
+                    if (currentUser.membership === 'free') return; // Prevent free users from unchecking
                     const newTypes = e.target.checked
                       ? [...questionConfig.questionTypes.filter(t => t !== 'mixed'), 'open-ended']
                       : questionConfig.questionTypes.filter(t => t !== 'open-ended');
@@ -386,47 +432,55 @@ const FilesList = () => {
               }
               label="Open Ended"
             />
+
+            {/* Other question types (Disabled for Free Users) */}
             <FormControlLabel
               control={
                 <Checkbox 
-                  checked={questionConfig.questionTypes.includes('mcq')} 
+                  checked={questionConfig.questionTypes.includes('mcq')}
                   onChange={(e) => {
                     const newTypes = e.target.checked
                       ? [...questionConfig.questionTypes.filter(t => t !== 'mixed'), 'mcq']
                       : questionConfig.questionTypes.filter(t => t !== 'mcq');
                     setQuestionConfig({...questionConfig, questionTypes: newTypes.length ? newTypes : ['mixed']});
                   }}
+                  disabled={currentUser.membership === 'free'}
                 />
               }
               label="Multiple Choice"
             />
+
             <FormControlLabel
               control={
                 <Checkbox 
-                  checked={questionConfig.questionTypes.includes('true-false')} 
+                  checked={questionConfig.questionTypes.includes('true-false')}
                   onChange={(e) => {
                     const newTypes = e.target.checked
                       ? [...questionConfig.questionTypes.filter(t => t !== 'mixed'), 'true-false']
                       : questionConfig.questionTypes.filter(t => t !== 'true-false');
                     setQuestionConfig({...questionConfig, questionTypes: newTypes.length ? newTypes : ['mixed']});
                   }}
+                  disabled={currentUser.membership === 'free'}
                 />
               }
               label="True/False"
             />
+
             <FormControlLabel
               control={
                 <Checkbox 
-                  checked={questionConfig.questionTypes.includes('mixed')} 
+                  checked={questionConfig.questionTypes.includes('mixed')}
                   onChange={(e) => {
                     setQuestionConfig({...questionConfig, questionTypes: e.target.checked ? ['mixed'] : ['open-ended']});
                   }}
+                  disabled={currentUser.membership === 'free'}
                 />
               }
               label="Mixed (All Types)"
             />
           </FormGroup>
         </DialogContent>
+
         
         <DialogActions>
           <Button onClick={() => setConfigDialogOpen(false)} color="inherit">

@@ -209,8 +209,9 @@
 // export default Timetable;
 
 import React, { useEffect, useState } from "react";
+import { jwtDecode } from "jwt-decode";
 import axios from "axios";
-import { useNavigate } from "react-router-dom";
+import { useNavigate,useLocation } from "react-router-dom";
 import {
   Table,
   TableBody,
@@ -234,6 +235,7 @@ import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import dayjs from "dayjs";
 
 const Timetable = () => {
+  const location = useLocation();
   const navigate = useNavigate();
   const [timetable, setTimetable] = useState({});
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -243,9 +245,49 @@ const Timetable = () => {
     startTime: null,
     endTime: null,
   });
+  const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState("");
+
+   useEffect(() => {
+      const fetchUser = async () => {
+        try {
+          const token = localStorage.getItem("token");
+          if (!token) {
+            navigate("/login");
+            return;
+          }
+  
+          
+          // Decode token to get user ID
+          const decoded = jwtDecode(token);
+          const userId = decoded.userId;
+  
+          // Fetch the latest user data from backend
+          const response = await axios.get(`http://localhost:8000/user/${userId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+  
+  
+          if (!response) {
+            throw new Error("Failed to fetch user data");
+          }
+  
+          const userData = await response.data;
+          console.log(userData);
+          setCurrentUser(userData); // Update state with fresh data
+          if(userData.membership !== "premium") {
+            navigate("/dashboard");
+          }
+
+        } catch (error) {
+          console.error("Fetching user error:", error);
+        }
+      };
+  
+      fetchUser();
+    }, [location.pathname]);
 
   // Fetch timetable
   const fetchTimetable = async () => {

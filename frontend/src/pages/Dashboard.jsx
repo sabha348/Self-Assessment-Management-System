@@ -1,14 +1,16 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useCallback  } from 'react';
 import { Book, Brain, Calculator, Layers, PenTool, Folder, Plus, Home, CreditCard, FolderArchive, FolderCheck, Clock, Calendar, CalendarCheck } from 'lucide-react';
 import { uploadFile } from '../services/fileService';
 import { toast } from 'react-toastify';
-import { useNavigate } from 'react-router-dom';
+import { useLocation,useNavigate } from 'react-router-dom';
 import Logout from '../components/auth/Logout'; //imported the logout 
 import { User } from 'lucide-react';
 import ProfileMenu from './ProfileMenu';
 import axios from 'axios';
+import { jwtDecode } from "jwt-decode";
 
 const Dashboard = () => {
+  const location = useLocation();
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
   const [pdfData, setPdfData] = useState(null);
@@ -16,6 +18,7 @@ const Dashboard = () => {
   const [timetable, setTimetable] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
 
   const handlePlusClick = () => {
     fileInputRef.current.click();
@@ -28,6 +31,43 @@ const Dashboard = () => {
       navigate('/login'); // Redirect to login if token is not found
     }
   }, [token, navigate]);
+
+
+  // it will retrive current user details 
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        if (!token) {
+          navigate("/login");
+          return;
+        }
+
+        
+        // Decode token to get user ID
+        const decoded = jwtDecode(token);
+        const userId = decoded.userId;
+
+        // Fetch the latest user data from backend
+        const response = await axios.get(`http://localhost:8000/user/${userId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+
+        if (!response) {
+          throw new Error("Failed to fetch user data");
+        }
+
+        const userData = await response.data;
+        console.log(userData);
+        setCurrentUser(userData); // Update state with fresh data
+      } catch (error) {
+        console.error("Fetching user error:", error);
+      }
+    };
+
+    fetchUser();
+  }, [location.pathname]);
 
   // Fetch timetable data from API
   useEffect(() => {
@@ -148,43 +188,38 @@ const Dashboard = () => {
         
         {/* Timetable Icon with Tooltip */}
         <div className="relative group">
-          <div className="p-2 rounded-lg hover:bg-gray-100 cursor-pointer"
-              onClick={() => navigate('/timetable')}
-          >
-            <CalendarCheck className="w-6 h-6 text-gray-600" />
-          </div>
-
-          {/* Tooltip */}
-          <div className="absolute left-full ml-2 hidden group-hover:flex items-center">
-            <div className="bg-black text-white text-sm py-1 px-2 rounded whitespace-nowrap">
-              My Timetable
-            </div>
-            {/* Arrow */}
-            <div className="absolute left-0 transform -translate-x-1 w-2 h-2 bg-black rotate-45"></div>
-          </div>
+        <div
+          className="p-2 rounded-lg hover:bg-gray-100 cursor-pointer"
+          onClick={() =>
+            currentUser.membership === "premium" && currentUser !== null
+              ? navigate("/timetable")
+              : navigate("/upgradepro")
+          }
+        >
+          <CalendarCheck className="w-6 h-6 text-gray-600" />
         </div>
-        
-        {/* Comment out Upload PDF Icon with Tooltip */}
-        {/* <div className="relative group">
-          <div 
-            className="p-2 rounded-lg hover:bg-gray-100 cursor-pointer"
-            onClick={handlePlusClick}
-          >
-            <Plus className="w-6 h-6 text-gray-600" />
-          </div>
-          
-          <div className="absolute left-full ml-2 hidden group-hover:flex items-center">
-            <div className="bg-black text-white text-sm py-1 px-2 rounded whitespace-nowrap">
-              Upload pdf
-            </div>
-            <div className="absolute left-0 transform -translate-x-1 w-2 h-2 bg-black rotate-45"></div>
-          </div>
-        </div> */}
 
+        {/* Tooltip */}
+        <div className="absolute left-full ml-2 hidden group-hover:flex items-center">
+          <div className="bg-black text-white text-sm py-1 px-2 rounded whitespace-nowrap">
+            My Timetable
+          </div>
+          {/* Arrow */}
+          <div className="absolute left-0 transform -translate-x-1 w-2 h-2 bg-black rotate-45"></div>
+        </div>
+      </div>
+
+        
+        
         {/* Comment out Pro Badge */}
-        {/* <div className="mt-auto p-2 bg-black text-white rounded-lg">
-          Pro
-        </div> */}
+        {currentUser?.membership !== "premium" && (
+        <div
+        className="mt-auto p-2 bg-black text-white rounded-lg cursor-pointer"
+        onClick={() => navigate("/upgradepro")}
+        >
+        Pro
+        </div>
+        )}
         
         {/* Use ProfileMenu component instead of direct logout */}
         <ProfileMenu />
@@ -215,13 +250,19 @@ const Dashboard = () => {
             </div>
             
             {/* Skill Analysis Card - NEW */}
-            <div className="p-6 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow"
-              onClick={() => navigate('/skills')}
+            <div
+              className="p-6 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow"
+              onClick={() =>
+                currentUser.membership === "premium"
+                  ? navigate("/skills")
+                  : navigate("/upgradepro")
+              }
             >
               <Calculator className="w-6 h-6 mb-3 text-gray-600" />
               <h3 className="font-medium">Skill Analysis</h3>
               <p className="text-sm text-gray-500">Track your progress</p>
             </div>
+
           </div>
         </div>
 

@@ -6,6 +6,7 @@ const authorizeRole = require('../middleware/authorize');
 const UserAnswer = require('../models/UserAnswer'); // Make sure path matches your project structure
 // Import the TopicMastery model
 const TopicMastery = require('../models/topicMastery');
+const Users = require('../models/Users');
 
 // Route to create a new user (Registration should be public)
 router.post('/', userController.createUser);
@@ -326,7 +327,11 @@ router.delete('/', authenticateToken, authorizeRole('admin'), userController.del
 
 router.get("/me", authenticateToken, async (req, res) => {
   try {
-      res.json(req.user); // Returns decoded user info (userId, role, membership)
+    const { userId } = req.user;
+    console.log(userId);
+    const user = await User.findById(userId);
+    console.log(user);
+    res.json(user); // Returns decoded user info (userId, role, membership)
   } catch (error) {
       res.status(500).json({ message: "Server Error" });
   }

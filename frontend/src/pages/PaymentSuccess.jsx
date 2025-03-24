@@ -7,7 +7,7 @@ const PaymentSuccess = () => {
     const navigate = useNavigate();
     const sessionId = searchParams.get("session_id");
     const [message, setMessage] = useState("");
-    const [status, setStatus] = useState("processing"); // Add this state
+    const [status, setStatus] = useState("processing");
 
     useEffect(() => {
         if (sessionId) {
@@ -21,8 +21,6 @@ const PaymentSuccess = () => {
 
     const confirmPayment = async () => {
         try {
-            console.log("Starting payment confirmation with session ID:", sessionId);
-            
             const { data } = await axios.post(
                 "http://localhost:8000/api/payment/confirm-payment",
                 { session_id: sessionId },
@@ -33,40 +31,26 @@ const PaymentSuccess = () => {
                     }
                 }
             );
-            
-            console.log("Payment confirmation response:", data);
-            
-            // Update status and message
-            setStatus("success"); // Add this line
+
+            setStatus("success");
             setMessage(data.message);
-            
-            // Update local user data
+
             if (data.user) {
                 const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-                const updatedUser = {
-                    ...currentUser,
-                    ...data.user
-                };
+                const updatedUser = { ...currentUser, ...data.user };
                 localStorage.setItem('user', JSON.stringify(updatedUser));
-                
-                // Dispatch an event to notify other components of the user update
                 window.dispatchEvent(new Event('userUpdated'));
             }
 
-            // Redirect to dashboard after successful payment
+            
+
             setTimeout(() => {
+                localStorage.setItem('needsUserRefresh', 'true');
                 navigate("/dashboard");
-            }, 2000);
-            
+            }, 4000);
         } catch (error) {
-            console.error("Payment confirmation error:", {
-                message: error.message,
-                response: error.response?.data
-            });
-            setStatus("error"); // Add this line
+            setStatus("error");
             setMessage(error.response?.data?.error || "Payment verification failed.");
-            
-            // Redirect to payment failed page after error
             setTimeout(() => {
                 navigate("/payment-failed");
             }, 3000);
@@ -74,28 +58,42 @@ const PaymentSuccess = () => {
     };
 
     return (
-        <div className="payment-status-container">
-            {status === "processing" && (
-                <div className="loading">
-                    <h2>Processing payment...</h2>
-                    <p>Please do not close this window</p>
-                </div>
-            )}
+        <div className="flex items-center justify-center min-h-screen bg-gray-100 px-4">
+            <div className="bg-white shadow-lg rounded-2xl p-6 w-full max-w-md text-center transition-all">
+                {status === "processing" && (
+                    <div className="flex flex-col items-center">
+                        <div className="w-12 h-12 border-4 border-gray-300 border-t-black rounded-full animate-spin"></div>
+                        <h2 className="text-xl font-semibold mt-4">Processing Payment...</h2>
+                        <p className="text-gray-500">Please do not close this window</p>
+                    </div>
+                )}
 
-            {status === "success" && (
-                <div className="success">
-                    <h2>{message}</h2>
-                    <p>Redirecting to dashboard...</p>
-                </div>
-            )}
+                {status === "success" && (
+                    <div className="flex flex-col items-center text-green-600">
+                        <svg className="w-16 h-16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                        <h2 className="text-2xl font-bold mt-4">{message}</h2>
+                        <p className="text-gray-500">Redirecting to dashboard...</p>
+                    </div>
+                )}
 
-            {status === "error" && (
-                <div className="error">
-                    <h2>Error</h2>
-                    <p>{message}</p>
-                    <button onClick={() => navigate("/")}>Return to Home</button>
-                </div>
-            )}
+                {status === "error" && (
+                    <div className="flex flex-col items-center text-red-600">
+                        <svg className="w-16 h-16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                        <h2 className="text-2xl font-bold mt-4">Error</h2>
+                        <p className="text-gray-500">{message}</p>
+                        <button
+                            className="mt-4 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition"
+                            onClick={() => navigate("/dashboard")}
+                        >
+                            Return to Dashboard
+                        </button>
+                    </div>
+                )}
+            </div>
         </div>
     );
 };

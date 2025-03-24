@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { authService } from '../../services/authService';
 import { useNavigate, Link } from 'react-router-dom';
+import { EyeIcon, EyeOffIcon } from 'lucide-react';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -8,6 +9,7 @@ const Login = () => {
     email: '',
     password: '',
   });
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleChange = (e) => {
     setCredentials({ ...credentials, [e.target.name]: e.target.value });
@@ -53,14 +55,19 @@ const Login = () => {
             </div>
             <div className="mb-4">
               <label className="block text-gray-700">Password</label>
+              <div className="relative">
               <input
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 name="password"
                 className="w-full p-2 border rounded-lg"
                 placeholder="Enter your password"
                 onChange={handleChange}
                 required
               />
+              <button type="button" className="absolute right-3 top-3" onClick={() => setShowPassword(!showPassword)}>
+                                {showPassword ? <EyeOffIcon size={20} /> : <EyeIcon size={20} />}
+                </button>
+              </div>
             </div>
             <button type="submit" className="w-full bg-black text-white py-2 rounded-lg">
               Login

@@ -23,10 +23,11 @@ connectDB();
 
 // Middleware
 app.use(cors({
-  origin: '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Added 'OPTIONS'
-  allowedHeaders: ['Content-Type', 'Authorization']
+  origin: "http://localhost:3000",
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  allowedHeaders: ["Content-Type", "Authorization"]
 }));
+
 
 // app.use(cors({
 //   origin: "http://localhost:3000", // Replace with your frontend URL
