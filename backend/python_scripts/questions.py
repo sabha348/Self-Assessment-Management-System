@@ -3,13 +3,16 @@ from dotenv import load_dotenv
 load_dotenv()
 import sys
 import json
+import base64
 from typing import Dict, List, Union
 from assessment_system import AssessmentSystem
 
 def json_encode(obj: Union[List, Dict, str]) -> str:
     """Helper function to properly encode JSON with special characters"""
     try:
-        return json.dumps(obj, ensure_ascii=False, indent=None)
+        json_str = json.dumps(obj, ensure_ascii=False)
+        # Base64 encode to avoid string escaping issues
+        return base64.b64encode(json_str.encode()).decode()
     except Exception as e:
         return json.dumps({"error": str(e)})
 

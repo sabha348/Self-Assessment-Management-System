@@ -1,13 +1,14 @@
 import React from 'react';
-import Sidebar from './Sidebar';
+import { Outlet } from 'react-router-dom';
+import MainSidebar from './MainSidebar';
 
-const Layout = ({ children }) => {
+const Layout = () => {
   return (
-    <div className="min-h-screen flex">
-      <Sidebar />
-      <main className="flex-1 ml-20 p-8">
-        {children}
-      </main>
+    <div className="flex min-h-screen bg-gray-50">
+      <MainSidebar />
+      <div className="flex-1 p-8 max-w-7xl mx-auto">
+        <Outlet />
+      </div>
     </div>
   );
 };

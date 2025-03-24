@@ -10,6 +10,8 @@ const registerUser = require('./authentication/register');
 const loginUser = require('./authentication/login'); 
 const { upload, uploadFile, getFiles } = require('./services/fileService');
 const quizRouter = require('./routes/quizRouter');
+const masteryRouter = require('./routes/masteryRouter'); // Add this line with your other router imports
+const userAnalyticsRouter = require('./routes/userAnalyticsRouter'); // Add this with your other router imports and registrations
 const mongoose = require('mongoose');
 // const upgradeMembership = require('./routes/membership');
 const paymentRoutes = require('./routes/paymentRouter'); 
@@ -51,6 +53,8 @@ app.use('/api/quizzes', quizRouter); // Added new quiz router
 app.use('/api/payment',paymentRoutes);
 
 // app.use('/api/membership/upgrade',upgradeMembership);
+app.use('/api/mastery', masteryRouter); // Add this line with your other app.use statements
+app.use('/api/user-analytics', userAnalyticsRouter); // Add this with your other app.use statements
 
 // Test route
 app.get('/api/test', (req, res) => {

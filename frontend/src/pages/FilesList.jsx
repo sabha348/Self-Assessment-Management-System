@@ -253,7 +253,15 @@ const FilesList = () => {
       
       <div className="max-w-6xl mx-auto">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold">My Documents</h1>
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={() => navigate('/dashboard')}
+              className="px-3 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 flex items-center gap-1 transition"
+            >
+              <span>←</span> Back
+            </button>
+            <h1 className="text-2xl font-bold">My Documents</h1>
+          </div>
           <div className="flex gap-3">
             <button 
               onClick={handleUpload}
@@ -404,6 +412,7 @@ const FilesList = () => {
               onChange={(e) => setQuestionConfig({...questionConfig, timeLimit: e.target.value})}
             >
               <MenuItem value={0}>No time limit</MenuItem>
+              <MenuItem value={1}>1 minute</MenuItem>
               <MenuItem value={5}>5 minutes</MenuItem>
               <MenuItem value={10}>10 minutes</MenuItem>
               <MenuItem value={15}>15 minutes</MenuItem>
@@ -478,7 +487,7 @@ const FilesList = () => {
               }
               label="Mixed (All Types)"
             />
-          </FormGroup>
+          </FormGroup> */}
         </DialogContent>
 
         

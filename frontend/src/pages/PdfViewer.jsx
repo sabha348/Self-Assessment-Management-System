@@ -44,12 +44,25 @@ const PdfViewer = () => {
   const [remainingTime, setRemainingTime] = useState(null);
   const [quizTimerInterval, setQuizTimerInterval] = useState(null);
 
+  // Add break notification related states
+  const [recentScores, setRecentScores] = useState([]);
+  const [showBreakNotification, setShowBreakNotification] = useState(false);
+  const [notificationIgnored, setNotificationIgnored] = useState(false);
+  const [lastBreakTimestamp, setLastBreakTimestamp] = useState(null);
+
   // Constants for text limits
   const TEXT_LIMITS = {
     MIN_CHARS: 100,
     MAX_CHARS: 1000,  // Reduced from 3000 to 1000 for better server handling
     OPTIMAL_CHARS: 500
   };
+
+  // Add after your other state declarations, around line 39
+  const [lastActiveTimestamp, setLastActiveTimestamp] = useState(() => {
+    // Initialize from localStorage or use current time
+    const saved = localStorage.getItem(`last-active-${userId}`);
+    return saved ? parseInt(saved, 10) : Date.now();
+  });
 
   // Create the plugins
   const defaultLayoutPluginInstance = defaultLayoutPlugin();
@@ -418,9 +431,80 @@ const clearQuizTimer = useCallback(() => {
   setRemainingTime(null);
 }, [quizTimerInterval]);
 
+// Replace your existing checkForBreakNotification function
+const checkForBreakNotification = useCallback(() => {
+  const today = new Date().toDateString();
+  
+  // Only consider scores from today
+  const todayScores = recentScores.filter(score => 
+    new Date(score.timestamp).toDateString() === today
+  );
+  
+  if (todayScores.length === 0) return;
+  
+  // Get the required number of consecutive low scores based on past user behavior
+  const requiredLowScores = notificationIgnored ? 2 : 5;
+  
+  // Check the most recent scores
+  const recentLowScores = todayScores
+    .slice(-requiredLowScores)
+    .filter(score => score.percentage < 60);
+    
+  // Only show notification if we have enough scores and they're all below threshold
+  if (recentLowScores.length >= requiredLowScores && 
+      recentLowScores.length === Math.min(todayScores.length, requiredLowScores)) {
+      
+    // Don't show notification too frequently (minimum 30 min between notifications)
+    const thirtyMinutesAgo = Date.now() - (30 * 60 * 1000);
+    
+    // Check for sufficient break since last notification
+    if (!lastBreakTimestamp || lastBreakTimestamp < thirtyMinutesAgo) {
+      setShowBreakNotification(true);
+      setLastBreakTimestamp(Date.now());
+      
+      // Reset counter in localStorage for persistence
+      localStorage.setItem(`last-break-${userId}`, Date.now().toString());
+      
+      // Track that notification was shown to user
+      trackBreakNotificationShown();
+    }
+  }
+}, [recentScores, notificationIgnored, lastBreakTimestamp, userId]);
+
+// Add new functions after the checkForBreakNotification function
+
+// Track when a notification is shown to the user
+const trackBreakNotificationShown = useCallback(async () => {
+  try {
+    const response = await axios.post('http://localhost:8000/api/user-analytics/break-notification', {
+      userId,
+      eventType: 'notification_shown',
+      timestamp: Date.now()
+    });
+    console.log('Break notification tracked:', response.data);
+  } catch (error) {
+    console.error('Error tracking break notification:', error);
+  }
+}, [userId]);
+
+// Track user's response to break notification
+const trackBreakResponse = useCallback(async (response) => {
+  try {
+    const data = {
+      userId,
+      eventType: response === 'accepted' ? 'break_taken' : 'break_ignored',
+      timestamp: Date.now()
+    };
+    const apiResponse = await axios.post('http://localhost:8000/api/user-analytics/break-notification', data);
+    console.log('Break response tracked:', apiResponse.data);
+  } catch (error) {
+    console.error('Error tracking break response:', error);
+  }
+}, [userId]);
+
   // Modified submit handler with useCallback and debugging
 const handleSubmitAnswers = useCallback(async (isTimeUp = false) => {
-  console.log('Submitting answers with:', { quizId, userId, questionsCount: questions.length });
+  console.log('Submitting answers with:', { quizId, userId, isTimeUp, remainingTime });
   
   if (!quizId) {
     console.error('Missing quiz ID');
@@ -434,7 +518,9 @@ const handleSubmitAnswers = useCallback(async (isTimeUp = false) => {
     return;
   }
 
-  const toastId = toast.loading(isTimeUp ? "Time's up! Submitting answers..." : "Submitting answers...");
+  // Only show "Time's up" if isTimeUp is true AND remainingTime is actually at or near zero
+  const showTimeUpMessage = isTimeUp && (!remainingTime || remainingTime <= 1000);
+  const toastId = toast.loading(showTimeUpMessage ? "Time's up! Submitting answers..." : "Submitting answers...");
 
   try {
     // Clear the quiz timer
@@ -458,15 +544,38 @@ const handleSubmitAnswers = useCallback(async (isTimeUp = false) => {
     });
 
     toast.dismiss(toastId);
+    
+    // Calculate score percentage
+    const scorePercentage = ((response.data.totalScore / questions.length) * 100);
+    
+    // Add score to recent scores
+    setRecentScores(prev => {
+      const newScores = [
+        ...prev, 
+        { 
+          percentage: scorePercentage, 
+          timestamp: Date.now(),
+          quizId: quizId
+        }
+      ];
+      
+      // Keep only the last 10 scores for memory efficiency
+      return newScores.slice(-10);
+    });
+    
     setEvaluationResults(response.data);
     setShowQuestions(false);
     setShowResults(true);
+    
+    // After processing the score, check if a break notification is needed
+    checkForBreakNotification();
+    
   } catch (error) {
     toast.dismiss(toastId);
     console.error('Error submitting answers:', error);
     toast.error('Failed to submit answers. Please try again.');
   }
-}, [quizId, userId, questions, answers, startTime, clearQuizTimer]);
+}, [quizId, userId, questions, answers, startTime, clearQuizTimer, checkForBreakNotification]);
 
   // Resume timer when results are closed
   const handleCloseResults = () => {
@@ -583,16 +692,15 @@ const startQuizTimer = useCallback((timeLimit) => {
     clearInterval(quizTimerInterval);
   }
   
-  // Calculate end time based on current time plus time limit
+  // Calculate end time
   const endTime = Date.now() + (timeLimit * 60 * 1000);
   setQuizEndTime(endTime);
   
-  // Create interval to update the timer display
+  // Create interval to update timer display
   const timerInterval = setInterval(() => {
     const now = Date.now();
     const timeLeft = endTime - now;
     
-    // Update the displayed time
     setRemainingTime(timeLeft);
     
     // Auto-submit when time runs out
@@ -600,19 +708,13 @@ const startQuizTimer = useCallback((timeLimit) => {
       clearInterval(timerInterval);
       setRemainingTime(0);
       
-      // Check if we have what we need to submit
-      if (!quizId || !userId) {
-        console.error("Timer expired but missing quizId or userId", {quizId, userId});
-        toast.error("Can't submit: Missing quiz ID or user ID");
-        return;
-      }
-      
-      handleSubmitAnswers(true); // Pass true to indicate time's up
+      // Get the CURRENT quiz ID, not the one from closure
+      handleSubmitAnswers(true); // This will check quizId internally
     }
   }, 1000);
   
   setQuizTimerInterval(timerInterval);
-}, [handleSubmitAnswers, quizId, userId, quizTimerInterval]);
+}, [handleSubmitAnswers, quizTimerInterval]);
 
 
 
@@ -628,6 +730,148 @@ useEffect(() => {
   };
 }, [quizTimerInterval, autoSubmissionTimer]);
 
+
+
+// Load recent scores from localStorage on component mount
+useEffect(() => {
+  const savedScores = localStorage.getItem(`recent-scores-${userId}`);
+  if (savedScores) {
+    try {
+      setRecentScores(JSON.parse(savedScores));
+    } catch (error) {
+      console.error('Error parsing saved scores:', error);
+    }
+  }
+}, [userId]);
+
+// Save recent scores to localStorage when they change
+useEffect(() => {
+  if (recentScores.length > 0 && userId) {
+    localStorage.setItem(`recent-scores-${userId}`, JSON.stringify(recentScores));
+  }
+}, [recentScores, userId]);
+
+// Break notification modal
+const BreakNotificationModal = () => (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4 p-6">
+      <div className="flex flex-col items-center text-center">
+        <div className="mb-4 text-yellow-500">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+        </div>
+        <h2 className="text-xl font-semibold text-gray-800 mb-2">Time for a Break</h2>
+        <p className="text-gray-600 mb-6">
+          We've noticed your recent scores have been declining. Research shows taking a short break (30+ minutes) can improve retention and performance.
+        </p>
+        <div className="flex space-x-4">
+          <button
+            onClick={() => {
+              setShowBreakNotification(false);
+              setNotificationIgnored(true);
+              // Store this decision in localStorage
+              localStorage.setItem(`notification-ignored-${userId}`, 'true');
+              // Track that user ignored the break
+              trackBreakResponse('ignored');
+            }}
+            className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors"
+          >
+            Continue Anyway
+          </button>
+          <button
+            onClick={() => {
+              setShowBreakNotification(false);
+              setNotificationIgnored(false);
+              // Capture time when user decided to take a break
+              const breakTime = Date.now();
+              localStorage.setItem(`break-start-${userId}`, breakTime.toString());
+              // Track that user took a break
+              trackBreakResponse('accepted');
+              // User accepted the break suggestion
+              navigate('/dashboard');
+            }}
+            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+          >
+            Take a Break
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+
+// Add this with your other component mount useEffect hooks
+useEffect(() => {
+  // Load break notification state from localStorage
+  const savedLastBreak = localStorage.getItem(`last-break-${userId}`);
+  if (savedLastBreak) {
+    setLastBreakTimestamp(parseInt(savedLastBreak, 10));
+  }
+  
+  const savedNotificationIgnored = localStorage.getItem(`notification-ignored-${userId}`);
+  if (savedNotificationIgnored) {
+    setNotificationIgnored(savedNotificationIgnored === 'true');
+  }
+}, [userId]);
+
+// Add persistence when notification state changes
+useEffect(() => {
+  if (notificationIgnored !== null) {
+    localStorage.setItem(`notification-ignored-${userId}`, notificationIgnored.toString());
+  }
+}, [notificationIgnored, userId]);
+
+// Add this with your other useEffect hooks
+useEffect(() => {
+  // This function should only run once on mount or when userId changes
+  // We need to check if the user is returning after a break without causing infinite loops
+  
+  const checkForBreakReturn = () => {
+    const savedTimestamp = localStorage.getItem(`last-active-${userId}`);
+    if (savedTimestamp) {
+      const lastActiveTime = parseInt(savedTimestamp, 10);
+      const currentTime = Date.now();
+      const timeAwayInMinutes = (currentTime - lastActiveTime) / (1000 * 60);
+      
+      // If returning after 30+ minutes, reset the notification ignored state
+      if (timeAwayInMinutes >= 30 && notificationIgnored) {
+        console.log(`User returning after ${Math.round(timeAwayInMinutes)} minutes - resetting notification state`);
+        setNotificationIgnored(false);
+      }
+    }
+    
+    // Update the timestamp in localStorage, but not in state
+    localStorage.setItem(`last-active-${userId}`, Date.now().toString());
+  };
+  
+  // Run once on component mount
+  checkForBreakReturn();
+  
+  // Set up event listeners to track when user leaves the page
+  const handleVisibilityChange = () => {
+    if (document.visibilityState === 'hidden') {
+      localStorage.setItem(`last-active-${userId}`, Date.now().toString());
+    } else {
+      // When coming back to the page, check if it was a long break
+      checkForBreakReturn();
+    }
+  };
+  
+  const handleBeforeUnload = () => {
+    localStorage.setItem(`last-active-${userId}`, Date.now().toString());
+  };
+  
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+  window.addEventListener('beforeunload', handleBeforeUnload);
+  
+  return () => {
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
+    window.removeEventListener('beforeunload', handleBeforeUnload);
+  };
+}, [userId, notificationIgnored]); // Remove lastActiveTimestamp from dependencies
 
   return (
     <div className="min-h-screen bg-gray-100 p-8">
@@ -772,7 +1016,7 @@ useEffect(() => {
               <div className="flex items-center space-x-4">
                 <h2 className="text-xl font-semibold text-gray-800">Evaluation Results</h2>
                 <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
-                  Total Score: {((evaluationResults.totalScore/5)*100).toFixed(2)}%
+                  Total Score: {((evaluationResults.totalScore/evaluationResults.evaluations.length)*100).toFixed(2)}%
                 </span>
               </div>
               <div className="flex space-x-4">
@@ -817,7 +1061,9 @@ useEffect(() => {
                             ? 'bg-green-100 text-green-800'
                             : 'bg-red-100 text-red-800'
                         }`}>
-                          {result.status === 'correct' ? 'Correct' : 'Incorrect'} ({result.accuracy}%)
+                          {result.status === 'correct' 
+                            ? `Correct (accuracy: ${result.accuracy}%)` 
+                            : `Incorrect (accuracy: ${result.accuracy}%)`}
                         </span>
                       </div>
                       
@@ -934,6 +1180,7 @@ useEffect(() => {
           </Worker>
         </div>
       </div>
+      {showBreakNotification && <BreakNotificationModal />}
     </div>
   );
 };

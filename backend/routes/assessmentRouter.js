@@ -89,9 +89,18 @@ router.post("/", async (req, res) => {
 
       // Clean questions array and ensure proper formatting
       questionsArray = questions.map(q => {
-        // Remove any leading/trailing quotes, dashes, and whitespace
-        return q.replace(/^["\s-]+|["\s]+$/g, '').trim();
-      });
+        if (typeof q !== 'string') {
+          console.warn('Non-string question received:', q);
+          return '';
+        }
+        
+        // More thorough sanitization
+        return q
+          .replace(/[\r\n]+/g, ' ')           // Replace all newlines with spaces
+          .replace(/\s{2,}/g, ' ')            // Replace multiple spaces with single space
+          .replace(/^["\s\-'"]+|["\s'"]+$/g, '') // Remove quotes, apostrophes, dashes at start/end
+          .trim();
+      }).filter(q => q.length > 0);  // Remove any empty questions
 
       // Categorize the text content
       console.log("Categorizing text content...");
@@ -134,7 +143,7 @@ router.post("/", async (req, res) => {
           typeof a === 'string' ? a.trim() : String(a)
         );
 
-        // Save questions with quiz reference and updated categories
+        // Save questions with quiz reference, updated categories, and position
         const savePromises = [];
         for (let i = 0; i < questionsArray.length; i++) {
           const newQuestion = new Question({
@@ -144,6 +153,8 @@ router.post("/", async (req, res) => {
             correctAnswer: cleanedCorrectAnswers[i],
             userId: userId,
             type: quiz.type,
+            // Add position field to maintain question order
+            position: i,
             // These will be automatically populated by our middleware if missing
             subject: quiz.subject,
             topic: quiz.topic,
@@ -197,30 +208,32 @@ router.post("/:quizId/submit", async (req, res) => {
     if (!quizId || !answers || !userId) {
       return res.status(400).json({ error: "Quiz ID, answers, and user ID are required" });
     }
-    
-    // Convert answers object to array format
-    const answersArray = Object.values(answers);
 
     // Fetch quiz details
     const quiz = await Quiz.findById(quizId);
     if (!quiz) {
       return res.status(404).json({ error: "Quiz not found" });
     }
-    // Fetch questions for the quiz
-    const questions = await Question.find({ quizeRef: quizId });
+    
+    // Fetch questions for the quiz and sort by position
+    const questions = await Question.find({ quizeRef: quizId })
+      .sort({ position: 1 });  // Sort by position in ascending order
+
     if (!questions || !questions.length) {
       return res.status(404).json({ error: "Questions not found for the quiz" });
     }
 
-    console.log('questions:',questions);
-     // Format data for evaluation
-     let questionsData = [];
-     let userAnswersData = [];
-     let correctAnswersData = [];
+    console.log('questions:', questions);
+    // Format data for evaluation
+    let questionsData = [];
+    let userAnswersData = [];
+    let correctAnswersData = [];
 
+    // Convert answers object to array format
+    const answersArray = Object.values(answers);
 
+    // Now the questions are in the correct order, match answers accordingly
     questions.forEach((question, index) => {
-      // const questionId = q.questionId;
       if (answersArray[index]) {
         questionsData.push(question.question);
         userAnswersData.push(answersArray[index]);
@@ -323,8 +336,9 @@ router.get("/:quizId/results/:userId", async (req, res) => {
       return res.status(404).json({ error: "Quiz not found" });
     }
     
-    // Get all questions for this quiz
-    const questions = await Question.find({ quizRef: quizId });
+    // Get all questions for this quiz in the correct order
+    const questions = await Question.find({ quizeRef: quizId })
+      .sort({ position: 1 });
     
     // Get user answers for this quiz
     const userAnswers = await UserAnswer.find({ 

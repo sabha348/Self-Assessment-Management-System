@@ -366,109 +366,110 @@ const Practice = () => {
   };
   
   // Mock data for recommendations until backend is ready
-  useEffect(() => {
-    // This would normally come from the API
-    const mockRecommendations = [
-      {
-        id: 1,
-        name: "Calculus",
-        type: "topic",
-        parentSubject: "Mathematics",
-        reason: "Weak Area",
-        image: "https://images.unsplash.com/photo-1635070041078-e363dbe005cb?q=80&w=500&auto=format"
-      },
-      {
-        id: 2,
-        name: "Thermodynamics",
-        type: "topic",
-        parentSubject: "Physics",
-        reason: "Next Step",
-        image: "https://images.unsplash.com/photo-1636466497217-26a8cbeaf0aa?q=80&w=500&auto=format"
-      },
-      {
-        id: 3,
-        name: "Quadratic Equations",
-        type: "concept",
-        parentSubject: "Mathematics",
-        parentTopic: "Algebra",
-        parentSubtopic: "Equations",
-        reason: "Popular",
-        image: "https://images.unsplash.com/photo-1509228627152-72ae9ae6848d?q=80&w=500&auto=format"
-      }
-    ];
-    
-    setRecommendedItems(mockRecommendations);
-    
-    // Mock topic progress
-    const mockProgress = {
-      "Calculus": 35,
-      "Algebra": 75,
-      "Geometry": 50,
-      "Thermodynamics": 20,
-      "Mechanics": 85
-    };
-    
-    setTopicProgress(mockProgress);
-  }, []);
+  // Remove this entire useEffect block
+  // useEffect(() => {
+  //   // This would normally come from the API
+  //   const mockRecommendations = [
+  //     {
+  //       id: 1,
+  //       name: "Calculus",
+  //       type: "topic",
+  //       parentSubject: "Mathematics",
+  //       reason: "Weak Area",
+  //       image: "https://images.unsplash.com/photo-1635070041078-e363dbe005cb?q=80&w=500&auto=format"
+  //     },
+  //     {
+  //       id: 2,
+  //       name: "Thermodynamics",
+  //       type: "topic",
+  //       parentSubject: "Physics",
+  //       reason: "Next Step",
+  //       image: "https://images.unsplash.com/photo-1636466497217-26a8cbeaf0aa?q=80&w=500&auto=format"
+  //     },
+  //     {
+  //       id: 3,
+  //       name: "Quadratic Equations",
+  //       type: "concept",
+  //       parentSubject: "Mathematics",
+  //       parentTopic: "Algebra",
+  //       parentSubtopic: "Equations",
+  //       reason: "Popular",
+  //       image: "https://images.unsplash.com/photo-1509228627152-72ae9ae6848d?q=80&w=500&auto=format"
+  //     }
+  //   ];
+  //   
+  //   setRecommendedItems(mockRecommendations);
+  //   
+  //   // Mock topic progress
+  //   const mockProgress = {
+  //     "Calculus": 35,
+  //     "Algebra": 75,
+  //     "Geometry": 50,
+  //     "Thermodynamics": 20,
+  //     "Mechanics": 85
+  //   };
+  //   
+  //   setTopicProgress(mockProgress);
+  // }, []);
 
   // Replace the mock useEffect with this:
-  useEffect(() => {
-    const fetchTopicMastery = async () => {
-      try {
-        // Get userId from localStorage or your authentication system
-        const userId = localStorage.getItem('userId') || '';
+  // useEffect(() => {
+  //   const fetchTopicMastery = async () => {
+  //     try {
+  //       // Get userId from localStorage or your authentication system
+  //       const userId = localStorage.getItem('userId') || '';
         
-        // Try to get mastery data from API
-        const response = await axios.get('http://localhost:8000/user/topic-mastery', {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          },
-          params: { userId }
-        });
+  //       // Try to get mastery data from API
+  //       const response = await axios.get('http://localhost:8000/user/topic-mastery', {
+  //         headers: {
+  //           'Authorization': `Bearer ${localStorage.getItem('token')}`
+  //         },
+  //         params: { userId }
+  //       });
         
-        if (response.data && Object.keys(response.data).length > 0) {
-          setTopicProgress(response.data);
-          return; // Skip localStorage if API worked
-        }
+  //       if (response.data && Object.keys(response.data).length > 0) {
+  //         setTopicProgress(response.data);
+  //         return; // Skip localStorage if API worked
+  //       }
         
-        // API had no data, fall back to localStorage
-        const storedMastery = localStorage.getItem('topicMastery');
-        if (storedMastery) {
-          setTopicProgress(JSON.parse(storedMastery));
-        } else {
-          // No data anywhere, use mock data
-          const mockProgress = {
-            "Calculus": 35,
-            "Algebra": 75,
-            "Geometry": 50,
-            "Thermodynamics": 20,
-            "Mechanics": 85
-          };
-          setTopicProgress(mockProgress);
-        }
-      } catch (error) {
-        console.error("Error fetching topic mastery:", error);
+  //       // API had no data, fall back to localStorage
+  //       const storedMastery = localStorage.getItem('topicMastery');
+  //       if (storedMastery) {
+  //         setTopicProgress(JSON.parse(storedMastery));
+  //       } else {
+  //         // No data anywhere, use mock data
+  //         const mockProgress = {
+  //           "Calculus": 35,
+  //           "Algebra": 75,
+  //           "Geometry": 50,
+  //           "Thermodynamics": 20,
+  //           "Mechanics": 85
+  //         };
+  //         setTopicProgress(mockProgress);
+  //       }
+  //     } catch (error) {
+  //       console.error("Error fetching topic mastery:", error);
         
-        // API failed, try localStorage
-        const storedMastery = localStorage.getItem('topicMastery');
-        if (storedMastery) {
-          setTopicProgress(JSON.parse(storedMastery));
-        } else {
-          // No data anywhere, use mock data
-          const mockProgress = {
-            "Calculus": 35,
-            "Algebra": 75,
-            "Geometry": 50,
-            "Thermodynamics": 20,
-            "Mechanics": 85
-          };
-          setTopicProgress(mockProgress);
-        }
-      }
-    };
+  //       // API failed, try localStorage
+  //       const storedMastery = localStorage.getItem('topicMastery');
+  //       if (storedMastery) {
+  //         setTopicProgress(JSON.parse(storedMastery));
+  //       } else {
+  //         // No data anywhere, use mock data
+  //         const mockProgress = {
+  //           "Calculus": 35,
+  //           "Algebra": 75,
+  //           "Geometry": 50,
+  //           "Thermodynamics": 20,
+  //           "Mechanics": 85
+  //         };
+  //         setTopicProgress(mockProgress);
+  //       }
+  //     }
+  //   };
     
-    fetchTopicMastery();
-  }, [location.pathname]);
+  //   fetchTopicMastery();
+  // }, [location.pathname]);
 
   // Add these functions to handle edit mode
   const startEditing = (currentName) => {
@@ -780,6 +781,20 @@ const handleDelete = async (item, level, parentItem) => {
           )}
         </Breadcrumbs>
 
+        {/* Back to Dashboard button - only show at subjects level */}
+        {!selectedSubject && (
+          <Box sx={{ mb: 3 }}>
+            <Button
+              startIcon={<ArrowBackIcon />}
+              onClick={() => navigate('/dashboard')}
+              variant="outlined"
+              color="primary"
+            >
+              Back to Dashboard
+            </Button>
+          </Box>
+        )}
+
         {/* Header Section */}
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 4 }}>
           {(selectedSubject || selectedTopic || selectedSubtopic || selectedConcept) && (
@@ -1059,7 +1074,7 @@ const handleDelete = async (item, level, parentItem) => {
           {selectedSubject && !selectedTopic && topics.map((topic) => (
             <Grid2 item xs={12} sm={6} md={4} lg={3} key={topic}>
               <StyledCard>
-                <Box sx={{ position: 'absolute', top: 10, right: 10, zIndex: 2 }}>
+                {/* <Box sx={{ position: 'absolute', top: 10, right: 10, zIndex: 2 }}>
                   <Tooltip title={`Mastery: ${topicProgress[topic] || 0}%`}>
                     <CircularProgress 
                       variant="determinate" 
@@ -1076,7 +1091,7 @@ const handleDelete = async (item, level, parentItem) => {
                       }}
                     />
                   </Tooltip>
-                </Box>
+                </Box> */}
                 <CardActionArea onClick={() => handleTopicClick(topic)}>
                   <CardMedia
                     component="img"
@@ -1470,9 +1485,9 @@ const handleDelete = async (item, level, parentItem) => {
 const AssessmentConfigModal = ({ open, handleClose, item, level, navigate }) => {
   const [config, setConfig] = useState({
     numQuestions: 5,
-    difficulty: 'mixed',
+    difficulty: 'Medium',
     timeLimit: 0, // 0 = no limit
-    questionTypes: ['multiple-choice'],
+    questionTypes: ['open-ended'],
     includeSubtopics: true,
     selectedItems: [] // Store selected topics/subtopics/concepts
   });
@@ -1632,7 +1647,7 @@ const AssessmentConfigModal = ({ open, handleClose, item, level, navigate }) => 
           </Select>
         </FormControl>
 
-        <FormControl component="fieldset" fullWidth margin="normal">
+         {/* <FormControl component="fieldset" fullWidth margin="normal">
           <FormLabel component="legend">Question Types</FormLabel>
           <FormGroup>
             <FormControlLabel
@@ -1669,7 +1684,7 @@ const AssessmentConfigModal = ({ open, handleClose, item, level, navigate }) => 
               label="True/False"
             />
           </FormGroup>
-        </FormControl>
+        </FormControl>  */}
 
         {/* Include all toggle and item selection */}
         {level && (level === 'subject' || level === 'topic' || level === 'subtopic') && (

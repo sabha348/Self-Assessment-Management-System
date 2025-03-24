@@ -9,6 +9,8 @@ const questionSchema = new Schema({
   options: { type: [String] },
   correctAnswer: { type: String, required: true },
   type: { type: String, default: 'multiple-choice' },
+  // Add position field to maintain question order
+  position: { type: Number, required: true, default: 0 },
   // Hierarchical fields
   subject: { type: String },
   topic: { type: String },
