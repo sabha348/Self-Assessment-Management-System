@@ -37,12 +37,12 @@ const ProfileMenu = () => {
           ref={menuRef}
           className="absolute left-8 mt-2 w-48 bg-white text-gray-800 rounded-lg shadow-lg py-2 border border-gray-300"
         >
-          <button
+          {/* <button
             className="flex items-center px-4 py-2 hover:bg-gray-200 w-full"
             onClick={() => navigate('/account')}
           >
             <FaCog className="mr-2" /> Account
-          </button>
+          </button> */}
           <hr className="border-gray-300" />
           <button
             className="flex items-center px-4 py-2 text-red-500 hover:bg-gray-200 w-full"

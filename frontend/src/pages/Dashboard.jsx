@@ -164,22 +164,7 @@ const Dashboard = () => {
           </div>
         </div>
         
-        {/* Comment out Upload PDF Icon with Tooltip */}
-        {/* <div className="relative group">
-          <div 
-            className="p-2 rounded-lg hover:bg-gray-100 cursor-pointer"
-            onClick={handlePlusClick}
-          >
-            <Plus className="w-6 h-6 text-gray-600" />
-          </div>
-          
-          <div className="absolute left-full ml-2 hidden group-hover:flex items-center">
-            <div className="bg-black text-white text-sm py-1 px-2 rounded whitespace-nowrap">
-              Upload pdf
-            </div>
-            <div className="absolute left-0 transform -translate-x-1 w-2 h-2 bg-black rotate-45"></div>
-          </div>
-        </div> */}
+
 
         {/* Comment out Pro Badge */}
         {/* <div className="mt-auto p-2 bg-black text-white rounded-lg">

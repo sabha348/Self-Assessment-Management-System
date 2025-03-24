@@ -41,19 +41,27 @@ function runPythonProcess(scriptPath, args) {
       }
 
       try {
-        // Clean the output string
-        const cleanedData = dataString
-          .replace(/[\n\r]/g, '') // Remove newlines
-          .replace(/^[\s\uFEFF\xA0]+|[\s\uFEFF\xA0]+$/g, '') // Remove BOM and whitespace
-          .replace(/\s+/g, ' '); // Replace multiple spaces with single space
-
-        // Parse the cleaned JSON
-        const parsedData = JSON.parse(cleanedData);
+        // Decode if base64 encoded
+        const jsonStr = Buffer.from(dataString.trim(), 'base64').toString();
+        const parsedData = JSON.parse(jsonStr);
         resolve(parsedData);
-      } catch (error) {
-        console.error('Raw output:', dataString);
-        console.error('Parsing error:', error);
-        reject(new Error(`Failed to parse Python output: ${error.message}`));
+      } catch (baseError) {
+        console.warn("Base64 decode failed, trying direct parse:", baseError.message);
+        try {
+          // Try to sanitize before parsing as a last resort
+          const sanitized = dataString.trim()
+            .replace(/[\r\n]+/g, ' ')
+            .replace(/\\n/g, ' ')
+            .replace(/\\/g, '\\\\')
+            .replace(/\t/g, ' ');
+            
+          const parsedData = JSON.parse(sanitized);
+          resolve(parsedData);
+        } catch (error) {
+          console.error("All parsing attempts failed:", error.message);
+          console.error("Raw data (first 200 chars):", dataString.substring(0, 200));
+          reject(new Error(`Failed to parse output: ${error.message}`));
+        }
       }
     });
   });

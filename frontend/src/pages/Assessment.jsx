@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { jwtDecode } from 'jwt-decode';
 import {
   Container, Box, Paper, Typography, Button, LinearProgress,
   Radio, RadioGroup, FormControlLabel, FormControl, TextField,
-  Divider, Card, CardContent, Chip, Alert, CircularProgress // Added CircularProgress
+  Divider, Card, CardContent, Chip, Alert, CircularProgress, IconButton // Added CircularProgress
 } from '@mui/material';
+import FlagIcon from '@mui/icons-material/Flag';
 
 // Temporary Timer component until you create one
 const Timer = ({ initialTime, onTimeUp }) => {
@@ -37,16 +39,123 @@ const Timer = ({ initialTime, onTimeUp }) => {
   );
 };
 
-// Simple Results Display component
+// Replace the simple ResultsDisplay component with this enhanced version
 const ResultsDisplay = ({ results, onFinish }) => (
   <Box>
-    <Typography variant="h5" gutterBottom>Assessment Results</Typography>
-    <Typography variant="h6" color="primary" gutterBottom>
-      Score: {results.score}%
-    </Typography>
-    <Button variant="contained" onClick={onFinish}>
-      Back to Practice
-    </Button>
+    {/* <Typography variant="h5" gutterBottom>Assessment Results</Typography> */}
+    
+    <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Typography variant="h6" color="primary">
+          Score: {results.score.toFixed(1)}%
+        </Typography>
+        <Box>
+          <Chip 
+            label={`${results.correctAnswers} of ${results.totalQuestions} correct`} 
+            color={results.score >= 70 ? "success" : results.score >= 50 ? "warning" : "error"}
+            sx={{ mr: 1 }}
+          />
+          {results.unansweredCount > 0 && (
+            <Chip 
+              label={`${results.unansweredCount} unanswered`} 
+              color="default"
+              variant="outlined"
+            />
+          )}
+        </Box>
+      </Box>
+      
+      {/* <LinearProgress
+        variant="determinate"
+        value={results.score}
+        sx={{ 
+          height: 10, 
+          borderRadius: 5,
+          mb: 3,
+          backgroundColor: '#e0e0e0',
+          '& .MuiLinearProgress-bar': {
+            backgroundColor: results.score >= 70 ? '#4caf50' : 
+                             results.score >= 50 ? '#ff9800' : '#f44336'
+          }
+        }}
+      /> */}
+      
+      <Divider sx={{ my: 2 }} />
+      
+      <Typography variant="h6" gutterBottom>Question Review:</Typography>
+      {results.evaluations.map((evaluation, index) => (
+        <Paper 
+          key={index}
+          sx={{ 
+            p: 2, 
+            mb: 2, 
+            borderLeft: '4px solid',
+            borderColor: evaluation.status === 'correct' ? 'success.main' : 
+                          evaluation.status === 'unanswered' ? 'grey.500' : 'error.main'
+          }}
+        >
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="subtitle1" gutterBottom>{`Question ${index + 1}`}</Typography>
+            {evaluation.status === 'unanswered' && (
+              <Chip 
+                label="Not Answered" 
+                size="small"
+                color="default"
+                sx={{ mb: 1 }}
+              />
+            )}
+          </Box>
+          
+          <Typography variant="body2" gutterBottom>{evaluation.question}</Typography>
+          
+          <Box sx={{ mt: 1 }}>
+            {evaluation.status === 'unanswered' ? (
+              <Typography variant="body2" color="text.secondary" fontStyle="italic">
+                You did not provide an answer for this question.
+              </Typography>
+            ) : (
+              <>
+                <Typography variant="caption" color="text.secondary">Your answer:</Typography>
+                <Typography variant="body2">{evaluation.user_answer || "<No answer provided>"}</Typography>
+              </>
+            )}
+            
+            {evaluation.status !== 'correct' && (
+              <>
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                  Correct answer:
+                </Typography>
+                <Typography variant="body2" color="success.main">
+                  {evaluation.correct_answer}
+                </Typography>
+                
+                {evaluation.missing_points && evaluation.missing_points.length > 0 && (
+                  <Box sx={{ mt: 1 }}>
+                    <Typography variant="caption" color="text.secondary">
+                      {evaluation.status === 'unanswered' ? 'Key points:' : 'You missed:'}
+                    </Typography>
+                    <ul style={{ margin: '4px 0', paddingLeft: '20px' }}>
+                      {evaluation.missing_points.map((point, i) => (
+                        <li key={i}><Typography variant="body2">{point}</Typography></li>
+                      ))}
+                    </ul>
+                  </Box>
+                )}
+              </>
+            )}
+          </Box>
+        </Paper>
+      ))}
+    </Paper>
+    
+    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+      <Button variant="outlined" onClick={onFinish}>
+        Back to Practice
+      </Button>
+      <Button variant="contained" color="primary" onClick={() => window.print()}>
+        Print Results
+      </Button>
+    </Box>
   </Box>
 );
 
@@ -65,6 +174,35 @@ const Assessment = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [assessmentComplete, setAssessmentComplete] = useState(false);
   const [results, setResults] = useState(null);
+  const [flaggedQuestions, setFlaggedQuestions] = useState({});
+
+  // Debug the config object
+  console.log("Assessment config:", {
+    level,
+    item,
+    configObj: config,
+    hasSubject: !!config?.subject,
+    hasTopic: !!config?.topic,
+    hasSubtopic: !!config?.subtopic
+  });
+
+  // Ensure parent fields are set based on navigation context
+  const parentSubject = level === 'subject' ? null : 
+                       (level === 'topic' ? item : 
+                       (config?.subject || null));
+
+  const parentTopic = level === 'subject' || level === 'topic' ? null : 
+                     (level === 'subtopic' ? item :
+                     (config?.topic || null));
+
+  const parentSubtopic = level !== 'concept' ? null : 
+                       (config?.subtopic || null);
+
+  console.log("Parent relationships:", {
+    parentSubject,
+    parentTopic,
+    parentSubtopic
+  });
 
   useEffect(() => {
     // Fetch appropriate questions based on level and item
@@ -125,52 +263,75 @@ const Assessment = () => {
     try {
       setIsSubmitting(true);
       
-      // Prepare answers for submission
+      // Prepare answers for submission - include ALL questions
       const formattedAnswers = {};
       questions.forEach((question, index) => {
-        if (answers[index]) {
-          formattedAnswers[index] = answers[index];
-        }
+        // Include all questions in submission, with explicit "unanswered" marker for empty ones
+        formattedAnswers[index] = answers[index] || "__UNANSWERED__";
       });
       
       // Get quiz ID from the first question or use a default
       const quizId = questions[0]?.quizeRef || 'default';
-      const userId = localStorage.getItem('userId') || '1'; // Replace with actual user ID retrieval
+      
+      // Get token for authentication
+      const token = localStorage.getItem('token');
+      let headers = {};
+      let userId = '1'; // Default fallback
+
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+        
+        // Extract userId from JWT token
+        try {
+          const decodedToken = jwtDecode(token);
+          userId = decodedToken?.userId || '1';
+          console.log("Using userId from token:", userId);
+        } catch (error) {
+          console.error("Error decoding token:", error);
+        }
+      }
       
       const response = await axios.post(`http://localhost:8000/api/assessment/${quizId}/submit`, {
         answers: formattedAnswers,
-        userId: userId,
+        userId: userId, // Use the extracted userId here
         timeTaken: Math.floor(config.timeLimit * 60 - timeRemaining),
-      });
+        includeUnanswered: true // Explicitly tell backend to process unanswered questions
+      }, { headers });
       
       setResults({
-        score: (response.data.totalScore / questions.length) * 100, // Properly calculate percentage
+        score: (response.data.totalScore / questions.length) * 100,
         evaluations: response.data.evaluations,
         correctAnswers: response.data.evaluations.filter(e => e.status === "correct").length,
-        totalQuestions: questions.length
+        totalQuestions: questions.length,
+        unansweredCount: Object.values(formattedAnswers).filter(a => a === "__UNANSWERED__").length
       });
       
       setAssessmentComplete(true);
       
-      // Update topic mastery data
-      if (level === 'topic') {
-        try {
-          // Try API first
-          await axios.post('http://localhost:8000/api/users/update-mastery', {
-            userId: localStorage.getItem('userId') || '1',
-            topic: item,
-            score: response.data.totalScore * 100
-          }).catch(error => {
-            console.error("API update failed, using localStorage fallback:", error);
-            
-            // Fallback to localStorage if API fails
-            const storedMastery = JSON.parse(localStorage.getItem('topicMastery') || '{}');
-            storedMastery[item] = response.data.totalScore * 100;
-            localStorage.setItem('topicMastery', JSON.stringify(storedMastery));
-          });
-        } catch (error) {
-          console.error("Failed to update mastery:", error);
-        }
+      // Store assessment results in the new model
+      try {
+        await axios.post('http://localhost:8000/api/mastery/save-assessment-result', {
+          userId: userId,
+          assessmentId: quizId,
+          level: level,
+          itemName: item,
+          parentSubject: parentSubject,
+          parentTopic: parentTopic,
+          parentSubtopic: parentSubtopic,
+          score: (response.data.totalScore / questions.length) * 100,
+          totalQuestions: questions.length,
+          correctAnswers: response.data.evaluations.filter(e => e.status === "correct").length,
+          timeTaken: Math.floor(config.timeLimit * 60 - timeRemaining),
+          date: new Date().toISOString(),
+          detailedResults: response.data.evaluations.map(evaluation => ({
+            questionId: evaluation.questionId,
+            // Map 'wrong' to 'incorrect' to match the schema's enum values
+            status: evaluation.status === "wrong" ? "incorrect" : evaluation.status,
+            conceptsEvaluated: evaluation.concepts || []
+          }))
+        }, { headers });
+      } catch (error) {
+        console.error("Failed to save assessment results:", error);
       }
     } catch (error) {
       console.error("Error submitting assessment:", error);
@@ -179,35 +340,93 @@ const Assessment = () => {
       setIsSubmitting(false);
     }
   };
+
+  // Modify the submit button to use this function
+  const confirmSubmit = () => {
+    // Check if all questions have been answered
+    const answeredCount = Object.keys(answers).length;
+    const unansweredCount = questions.length - answeredCount;
+    
+    if (unansweredCount > 0) {
+      const confirmSubmission = window.confirm(
+        `You have ${unansweredCount} unanswered questions. Are you sure you want to submit?`
+      );
+      if (!confirmSubmission) return;
+    } else {
+      const confirmSubmission = window.confirm(
+        "Are you sure you want to submit your assessment?"
+      );
+      if (!confirmSubmission) return;
+    }
+    
+    handleSubmit();
+  };
   
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
-      {/* Assessment header */}
+      {/* Assessment header - conditionally render parts based on assessment status */}
       <Box sx={{ mb: 4 }}>
         <Typography variant="h4" gutterBottom>
-          {item} Assessment
+          {assessmentComplete ? `${item} Assessment Results` : `${item} Assessment`}
         </Typography>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Chip
-            label={`${currentQuestionIndex + 1} of ${questions.length} questions`}
-            color="primary"
-            variant="outlined"
-          />
-          {config.timeLimit > 0 && (
-            <Timer 
-              initialTime={config.timeLimit * 60} 
-              onTimeUp={handleSubmit}
+        
+        {/* Only show progress tracking elements when assessment is in progress */}
+        {!assessmentComplete && (
+          <>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Chip
+                label={`${currentQuestionIndex + 1} of ${questions.length} questions`}
+                color="primary"
+                variant="outlined"
+              />
+              {config.timeLimit > 0 && (
+                <Timer 
+                  initialTime={config.timeLimit * 60} 
+                  onTimeUp={handleSubmit}
+                />
+              )}
+            </Box>
+            
+            <LinearProgress 
+              variant="determinate" 
+              value={((currentQuestionIndex) / questions.length) * 100}
+              sx={{ mt: 2, height: 8, borderRadius: 4 }}
             />
-          )}
-        </Box>
-        <LinearProgress 
-          variant="determinate" 
-          value={((currentQuestionIndex) / questions.length) * 100}
-          sx={{ mt: 2, height: 8, borderRadius: 4 }}
-        />
+            
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 2 }}>
+              {questions.map((_, idx) => (
+                <Chip
+                  key={idx}
+                  label={idx + 1}
+                  onClick={() => setCurrentQuestionIndex(idx)}
+                  color={currentQuestionIndex === idx ? "primary" : 
+                         answers[idx] ? "success" : 
+                         flaggedQuestions[idx] ? "warning" : "default"}
+                  variant={currentQuestionIndex === idx ? "filled" : "outlined"}
+                  sx={{ 
+                    minWidth: '36px', 
+                    cursor: 'pointer',
+                    position: 'relative',
+                    '&::after': !answers[idx] && {
+                      content: '""',
+                      position: 'absolute',
+                      top: '3px',
+                      right: '3px',
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      backgroundColor: flaggedQuestions[idx] ? 'warning.main' : 'error.light',
+                      opacity: 0.8
+                    }
+                  }}
+                />
+              ))}
+            </Box>
+          </>
+        )}
       </Box>
       
-      {/* Question display */}
+      {/* Question display or results display */}
       {loading ? (
         <Box sx={{ textAlign: 'center', py: 8 }}>
           <CircularProgress />
@@ -223,13 +442,25 @@ const Assessment = () => {
         <ResultsDisplay results={results} onFinish={() => navigate('/practice')} />
       ) : (
         <Card sx={{ mb: 4, boxShadow: 3, borderRadius: 2 }}>
-          <CardContent sx={{ p: 4 }}>
+          <CardContent sx={{ p: 4, position: 'relative' }}>
             <Typography variant="h6" gutterBottom>
               Question {currentQuestionIndex + 1}
             </Typography>
             <Typography variant="body1" sx={{ mb: 3 }}>
               {questions[currentQuestionIndex]?.question}
             </Typography>
+            
+            <Box sx={{ position: 'absolute', top: 10, right: 10 }}>
+              <IconButton 
+                color={flaggedQuestions[currentQuestionIndex] ? "error" : "default"}
+                onClick={() => setFlaggedQuestions(prev => ({
+                  ...prev,
+                  [currentQuestionIndex]: !prev[currentQuestionIndex]
+                }))}
+              >
+                <FlagIcon />
+              </IconButton>
+            </Box>
             
             {/* Answer section - based on question type */}
             {(questions[currentQuestionIndex]?.type === 'multiple-choice' || 
@@ -298,7 +529,7 @@ const Assessment = () => {
             <Button
               variant="contained"
               color="success"
-              onClick={handleSubmit}
+              onClick={confirmSubmit}
               disabled={isSubmitting}
             >
               {isSubmitting ? 'Submitting...' : 'Submit Assessment'}
