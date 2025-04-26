@@ -2,7 +2,6 @@ const jwt = require('jsonwebtoken');
 
 const authenticateToken = (req, res, next) => {
     try {
-        
         const token = req.header('Authorization').replace('Bearer ', '');
 
         if (!token) {
@@ -12,12 +11,21 @@ const authenticateToken = (req, res, next) => {
         // Verify token
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         req.user = decoded; // Attach user details to request
-        // console.log(req.user);
-        // console.log("hello");
         next();
     } catch (error) {
         res.status(401).json({ message: 'Invalid Token' });
     }
 };
 
-module.exports = authenticateToken;
+const isAdmin = (req, res, next) => {
+    if (req.user && req.user.role === 'admin') {
+        next();
+    } else {
+        res.status(403).json({ message: 'Access Denied: Admin privileges required' });
+    }
+};
+
+module.exports = {
+    authenticateToken,
+    isAdmin
+};

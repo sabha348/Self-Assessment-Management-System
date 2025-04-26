@@ -1,12 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const userController = require('../controllers/userController');
-const authenticateToken = require('../middleware/authenticate');
+const {authenticateToken} = require('../middleware/authenticate');
 const authorizeRole = require('../middleware/authorize');
 const UserAnswer = require('../models/UserAnswer'); // Make sure path matches your project structure
 // Import the TopicMastery model
 const AssessmentResult = require('../models/AssessmentResult');
-const Users = require('../models/Users');
+const User = require('../models/Users');
+const bcrypt = require('bcrypt'); // Import bcrypt
 
 // Route to create a new user (Registration should be public)
 router.post('/', userController.createUser);
@@ -15,7 +16,18 @@ router.post('/', userController.createUser);
 router.get('/', userController.getAllUsers);
 
 
-
+router.get("/me", authenticateToken, async (req, res) => {
+  try {
+    console.log(req.user);
+    const { userId } = req.user;
+    console.log(userId);
+    const user = await User.findById(userId);
+    console.log(user);
+    res.json(user); // Returns decoded user info (userId, role, membership)
+  } catch (error) {
+      res.status(500).json({ message: "Server Error" });
+  }
+});
 
 // Add this route to your existing userRouter.js
 
@@ -90,7 +102,7 @@ router.get('/:id', authenticateToken, userController.getUserById);
 router.put('/:id', authenticateToken, userController.updateUser);
 
 // Route to delete a user by ID (Only admins should be able to delete any user)
-router.delete('/:id', authenticateToken, authorizeRole('admin'), userController.deleteUserById);
+router.delete('/:id', authenticateToken, userController.deleteUserById);
 
 // Route to delete all users (Highly restricted - Admin only)
 router.delete('/', authenticateToken, authorizeRole('admin'), userController.deleteAllUsers);
@@ -98,6 +110,7 @@ router.delete('/', authenticateToken, authorizeRole('admin'), userController.del
 
 router.get("/me", authenticateToken, async (req, res) => {
   try {
+    console.log(req.user);
     const { userId } = req.user;
     console.log(userId);
     const user = await User.findById(userId);
@@ -107,5 +120,10 @@ router.get("/me", authenticateToken, async (req, res) => {
       res.status(500).json({ message: "Server Error" });
   }
 });
+
+// Add to your user routes file
+router.post('/change-password', authenticateToken, userController.changePassword);
+
+
 
 module.exports = router;

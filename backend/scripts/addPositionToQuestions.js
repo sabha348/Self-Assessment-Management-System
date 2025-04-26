@@ -3,40 +3,65 @@ const Quiz = require('../models/Quiz');
 const Question = require('../models/Question');
 const connectDB = require('../config/db');
 
-async function addPositionToQuestions() {
-  await connectDB();
-  console.log('Connected to database');
-  
-  // Get all quizzes
-  const quizzes = await Quiz.find({});
-  console.log(`Found ${quizzes.length} quizzes to process`);
-  
-  let updated = 0;
-  
-  for (const quiz of quizzes) {
-    // Get all questions for this quiz
-    const questions = await Question.find({ quizeRef: quiz._id });
+async function revertUserFieldsMigration() {
+  try {
+    // Connect to database
+    await connectDB();
+    console.log('Connected to database');
     
-    // Sort questions by their creation time (using ObjectId creation time)
-    questions.sort((a, b) => {
-      return a._id.getTimestamp() - b._id.getTimestamp();
+    // First, let's check what documents we have to potentially fix
+    const quizDocWithBothCount = await Quiz.countDocuments({ 
+      createdBy: { $exists: true }, 
+      userId: { $exists: true }
     });
     
-    // Update the position field
-    for (let i = 0; i < questions.length; i++) {
-      questions[i].position = i;
-      await questions[i].save();
-      updated++;
-    }
+    const questionDocWithBothCount = await Question.countDocuments({ 
+      createdBy: { $exists: true }, 
+      userId: { $exists: true }
+    });
     
-    console.log(`Updated position for ${questions.length} questions in quiz ${quiz._id}`);
+    console.log(`Found ${quizDocWithBothCount} Quiz documents with both fields`);
+    console.log(`Found ${questionDocWithBothCount} Question documents with both fields`);
+
+    // Step 1: Remove userId field from Quiz documents where it was added based on createdBy
+    const quizResult = await Quiz.updateMany(
+      { 
+        createdBy: { $exists: true }, 
+        userId: { $exists: true },
+        },
+      { $unset: { userId: "" } }
+    );
+
+    // Step 2: Remove createdBy field from Question documents where it was added based on userId
+    const questionResult = await Question.updateMany(
+      { 
+        createdBy: { $exists: true }, 
+        userId: { $exists: true },
+      },
+      { $unset: { createdBy: "" } }
+    );
+
+    // Extract proper counts (MongoDB driver might return different object structures)
+    const quizModified = quizResult?.modifiedCount || quizResult?.nModified || 0;
+    const questionModified = questionResult?.modifiedCount || questionResult?.nModified || 0;
+
+    console.log(`Reverted ${quizModified} Quiz documents: removed userId field`);
+    console.log(`Reverted ${questionModified} Question documents: removed createdBy field`);
+    
+    // Log total changes
+    const totalDocumentsModified = quizModified + questionModified;
+
+    console.log(`Migration reverted: ${totalDocumentsModified} total documents modified`);
+    console.log(`Quiz update result:`, JSON.stringify(quizResult));
+    console.log(`Question update result:`, JSON.stringify(questionResult));
+    
+    // Exit successfully
+    process.exit(0);
+  } catch (error) {
+    console.error('Error during migration reversion:', error);
+    process.exit(1);
   }
-  
-  console.log(`Successfully updated ${updated} questions with position values`);
-  process.exit(0);
 }
 
-addPositionToQuestions().catch(err => {
-  console.error('Error in migration script:', err);
-  process.exit(1);
-});
+// Run the migration reversion
+revertUserFieldsMigration();

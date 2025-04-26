@@ -1,0 +1,114 @@
+.balance-page {
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.balance-filters {
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.date-range {
+  display: flex;
+  gap: 15px;
+  align-items: flex-end;
+}
+
+.revenue-summary {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.total-revenue {
+  background-color: #3B82F6;
+  color: white;
+  border-radius: 8px;
+  padding: 20px;
+  flex: 1;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.total-revenue h2 {
+  font-size: 18px;
+  margin-bottom: 15px;
+  font-weight: normal;
+}
+
+.amount {
+  font-size: 36px;
+  font-weight: bold;
+}
+
+.metrics-cards {
+  display: flex;
+  flex: 2;
+  gap: 20px;
+}
+
+.metric-card {
+  background-color: white;
+  border-radius: 8px;
+  padding: 20px;
+  flex: 1;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.metric-card h3 {
+  font-size: 16px;
+  color: #666;
+  margin-bottom: 15px;
+}
+
+.metric-value {
+  font-size: 30px;
+  font-weight: bold;
+  color: #333;
+}
+
+.recent-transactions {
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding: 20px;
+}
+
+.transactions-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.transactions-table th {
+  text-align: left;
+  padding: 12px 15px;
+  border-bottom: 1px solid #eee;
+}
+
+.transactions-table td {
+  padding: 12px 15px;
+  border-bottom: 1px solid #eee;
+}
+
+.no-data {
+  text-align: center;
+  color: #666;
+  padding: 30px;
+}
+
+@media (max-width: 768px) {
+  .date-range {
+    flex-direction: column;
+  }
+  
+  .revenue-summary {
+    flex-direction: column;
+  }
+  
+  .metrics-cards {
+    flex-direction: column;
+  }
+}

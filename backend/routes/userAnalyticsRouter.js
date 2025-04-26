@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const authenticateToken = require('../middleware/authenticate');
+const {authenticateToken} = require('../middleware/authenticate');
 const BreakEvent = require('../models/BreakEvent');
 
 // Record break notification events

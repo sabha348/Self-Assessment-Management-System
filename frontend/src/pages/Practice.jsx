@@ -51,6 +51,10 @@ import EditIcon from '@mui/icons-material/Edit';
 import SaveIcon from '@mui/icons-material/Save';
 import CancelIcon from '@mui/icons-material/Cancel';
 import DeleteIcon from '@mui/icons-material/Delete';
+import AddIcon from '@mui/icons-material/Add';
+import UploadFileIcon from '@mui/icons-material/UploadFile';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import MenuBookIcon from '@mui/icons-material/MenuBook';
 import { styled } from '@mui/material/styles';
 import { useNavigate, useLocation } from 'react-router-dom';
 // Comment out ForceGraph if you're not using it yet
@@ -167,19 +171,22 @@ const Practice = () => {
     try {
       setLoading(true);
       setProgress(30);
-      const response = await axios.get('http://localhost:8000/api/quizzes/subjects');
-      setSubjects(response.data.subjects?.length > 0 ? response.data.subjects : [
-        "Mathematics", "Physics", "Biology", "Chemistry",
-        "Literature", "History", "Geography", "Computer Science"
-      ]);
+      
+      // Get the token from localStorage
+      const token = localStorage.getItem('token');
+      
+      const response = await axios.get('http://localhost:8000/api/quizzes/subjects', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      console.log('Subjects response:', response.data);
+      setSubjects(response.data.subjects || []);
       setProgress(100);
     } catch (err) {
       console.error('Error fetching subjects:', err);
       setError('Failed to load subjects');
-      setSubjects([
-        "Mathematics", "Physics", "Biology", "Chemistry",
-        "Literature", "History", "Geography", "Computer Science"
-      ]);
+      setSubjects([]);
     } finally {
       setLoading(false);
       setProgress(0);
@@ -192,7 +199,15 @@ const Practice = () => {
       setLoading(true);
       setProgress(30);
       console.log(`Fetching topics for subject: ${subject}`);
-      const response = await axios.get(`http://localhost:8000/api/quizzes/topics/${encodeURIComponent(subject)}`);
+      
+      // Get the token from localStorage
+      const token = localStorage.getItem('token');
+      
+      const response = await axios.get(`http://localhost:8000/api/quizzes/topics/${encodeURIComponent(subject)}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       console.log('Topics response:', response.data);
       setTopics(response.data.topics || []);
       setProgress(100);
@@ -212,7 +227,15 @@ const Practice = () => {
       setLoading(true);
       setProgress(30);
       console.log(`Fetching subtopics for topic: ${topic}`);
-      const response = await axios.get(`http://localhost:8000/api/quizzes/subtopics/${encodeURIComponent(topic)}`);
+      
+      // Get the token from localStorage
+      const token = localStorage.getItem('token');
+      
+      const response = await axios.get(`http://localhost:8000/api/quizzes/subtopics/${encodeURIComponent(topic)}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       console.log('Subtopics response:', response.data);
       setSubtopics(response.data.subtopics || []);
       setProgress(100);
@@ -230,7 +253,15 @@ const Practice = () => {
     try {
       setLoading(true);
       setProgress(30);
-      const response = await axios.get(`http://localhost:8000/api/quizzes/concepts/${encodeURIComponent(subtopic)}`);
+      
+      // Get the token from localStorage
+      const token = localStorage.getItem('token');
+      
+      const response = await axios.get(`http://localhost:8000/api/quizzes/concepts/${encodeURIComponent(subtopic)}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       setConcepts(response.data.concepts || []);
       setProgress(100);
     } catch (err) {
@@ -245,7 +276,15 @@ const Practice = () => {
   const fetchQuestions = useCallback(async (concept) => {
     try {
       setLoadingQuestions(true);
-      const response = await axios.get(`http://localhost:8000/api/quizzes/questions/concept/${encodeURIComponent(concept)}`);
+      
+      // Get the token from localStorage
+      const token = localStorage.getItem('token');
+      
+      const response = await axios.get(`http://localhost:8000/api/quizzes/questions/concept/${encodeURIComponent(concept)}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       setConceptQuestions(response.data.questions || []);
     } catch (err) {
       setQuestionError(`Failed to load questions for ${concept}`);
@@ -738,6 +777,15 @@ const handleDelete = async (item, level, parentItem) => {
         >
           Go to Dashboard
         </Button>
+        <Button
+          variant="contained"
+          color="success"
+          startIcon={<UploadFileIcon />}
+          onClick={() => navigate('/files')} 
+          sx={{ mr: 2 }}
+        >
+          Upload & Study
+        </Button>
           <MuiLink
             component="button"
             onClick={() => handleNavigationBack()}
@@ -1053,7 +1101,7 @@ const handleDelete = async (item, level, parentItem) => {
                     >
                       Practice
                     </Button>
-                    {/* <Button 
+                     <Button 
                       size="small"
                       color="error"
                       startIcon={<DeleteIcon />}
@@ -1064,7 +1112,7 @@ const handleDelete = async (item, level, parentItem) => {
                       sx={{ ml: 1 }}
                     >
                       Delete
-                    </Button> */}
+                    </Button>
                   </Box>
                 </CardActions>
               </StyledCard>
@@ -1397,7 +1445,7 @@ const handleDelete = async (item, level, parentItem) => {
           </Box>
         )}
         
-        {/* Recommended Items Section */}
+        {/* Recommended Items Section - only show if actual recommendations exist */}
         {selectedSubject && !loading && recommendedItems.length > 0 && (
           <Box sx={{ mt: 6 }}>
             <Typography variant="h5" sx={{ mb: 3, fontWeight: 700 }}>Recommended for You</Typography>
@@ -1467,6 +1515,49 @@ const handleDelete = async (item, level, parentItem) => {
             </Grid2>
           </Box>
         )}
+
+        {/* Welcome message for brand new users with no subjects */}
+        {!selectedSubject && subjects.length === 0 && !loading && !error && (
+          <Box sx={{ mb: 5 }}>
+            <Paper
+              elevation={3}
+              sx={{
+                p: 4,
+                borderRadius: 4,
+                background: 'linear-gradient(145deg, #e3f2fd 0%, #bbdefb 100%)',
+              }}
+            >
+              <Typography variant="h4" gutterBottom color="primary.dark">
+                Welcome to Your Self-Assessment Hub!
+              </Typography>
+              <Typography variant="body1" paragraph>
+                This is where all your automatically generated quizzes will appear as you study documents. 
+                To get started, upload study materials and generate questions while reading.
+              </Typography>
+              
+              <Box sx={{ display: 'flex', gap: 3, mt: 3, flexWrap: 'wrap' }}>
+                <Button 
+                  variant="contained"
+                  size="large"
+                  startIcon={<UploadFileIcon />}
+                  onClick={() => navigate('/files')}
+                  sx={{ borderRadius: '12px', py: 1.5 }}
+                >
+                  Upload Study Documents
+                </Button>
+                <Button
+                  variant="outlined"
+                  size="large"
+                  startIcon={<PlayArrowIcon />}
+                  onClick={() => navigate('/timetable')}
+                  sx={{ borderRadius: '12px', py: 1.5 }}
+                >
+                  View Study Schedule
+                </Button>
+              </Box>
+            </Paper>
+          </Box>
+        )}
       </Container>
 
       {/* Assessment Configuration Modal */}
@@ -1505,6 +1596,9 @@ const AssessmentConfigModal = ({ open, handleClose, item, level, navigate }) => 
   
   const fetchAvailableItems = async () => {
     if (!level || !item) return;
+    // Get the token from localStorage
+    const token = localStorage.getItem('token');
+    
     
     setLoadingItems(true);
     try {
@@ -1518,7 +1612,11 @@ const AssessmentConfigModal = ({ open, handleClose, item, level, navigate }) => 
       }
       
       if (endpoint) {
-        const response = await axios.get(`http://localhost:8000${endpoint}`);
+        const response = await axios.get(`http://localhost:8000${endpoint}`,{
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
         
         // Extract the appropriate data based on level
         let items = [];
@@ -1810,6 +1908,132 @@ const KnowledgeMap = ({ subject, topic, subtopic, handleSubjectClick, handleTopi
         Preview Concept Map
       </Button>
     </Box>
+  );
+};
+
+// EmptyState component for showing meaningful guidance when no content exists
+const EmptyState = ({ type, parentName, onUploadClick, onCreateClick }) => {
+  // Configure content based on type
+  const content = {
+    subjects: {
+      title: "No Subjects Available Yet",
+      description: "You haven't created any quiz subjects yet. Upload study materials and generate questions, or create a subject manually.",
+      primaryButton: "Upload Study Material",
+      primaryIcon: <UploadFileIcon />,
+      secondaryButton: "Create Subject Manually",
+      secondaryIcon: <AddIcon />,
+      image: "https://img.icons8.com/fluency/240/000000/empty-box.png"
+    },
+    topics: {
+      title: `No Topics in ${parentName}`,
+      description: `The ${parentName} subject doesn't have any topics yet. Topics are created automatically when you study documents related to ${parentName}.`,
+      primaryButton: "Upload Study Material",
+      primaryIcon: <UploadFileIcon />,
+      secondaryButton: "Create Topic Manually",
+      secondaryIcon: <AddIcon />,
+      image: "https://img.icons8.com/fluency/240/000000/open-book.png"
+    },
+    subtopics: {
+      title: `No Subtopics in ${parentName}`,
+      description: `The ${parentName} topic doesn't have any subtopics yet. Continue studying materials about ${parentName} to generate quizzes automatically.`,
+      primaryButton: "Upload Study Material",
+      primaryIcon: <UploadFileIcon />,
+      secondaryButton: "Create Subtopic",
+      secondaryIcon: <AddIcon />,
+      image: "https://img.icons8.com/fluency/240/000000/bookmark.png"
+    },
+    concepts: {
+      title: `No Concepts in ${parentName}`,
+      description: `The ${parentName} subtopic doesn't have any concepts yet. Reading and generating questions from study materials will create concepts automatically.`,
+      primaryButton: "Upload Study Material",
+      primaryIcon: <UploadFileIcon />,
+      secondaryButton: "Create Concept",
+      secondaryIcon: <AddIcon />,
+      image: "https://img.icons8.com/fluency/240/000000/idea.png"
+    }
+  }[type];
+
+  return (
+    <Paper
+      elevation={0}
+      sx={{
+        p: 5,
+        textAlign: 'center',
+        borderRadius: 4,
+        backgroundColor: 'rgba(255,255,255,0.9)',
+        backdropFilter: 'blur(8px)',
+        border: '1px dashed #e0e0e0',
+        maxWidth: '800px',
+        mx: 'auto',
+        my: 5
+      }}
+    >
+      <img 
+        src={content.image} 
+        alt="Empty state illustration"
+        style={{ width: '120px', height: '120px', marginBottom: '1.5rem' }}
+      />
+      <Typography variant="h5" color="primary.main" gutterBottom sx={{ fontWeight: 600 }}>
+        {content.title}
+      </Typography>
+      <Typography variant="body1" color="text.secondary" paragraph sx={{ mb: 4, maxWidth: '600px', mx: 'auto' }}>
+        {content.description}
+      </Typography>
+      
+      <Box sx={{ display: 'flex', flexDirection: {xs: 'column', sm: 'row'}, justifyContent: 'center', gap: 2 }}>
+        <Button
+          variant="contained"
+          color="primary"
+          size="large"
+          onClick={onUploadClick}
+          startIcon={content.primaryIcon}
+          sx={{ 
+            borderRadius: '12px',
+            px: 3,
+            py: 1.5,
+            boxShadow: 2,
+            '&:hover': {
+              transform: 'translateY(-3px)',
+              boxShadow: 4,
+              transition: 'all 0.2s'
+            }
+          }}
+        >
+          {content.primaryButton}
+        </Button>
+        
+        <Button
+          variant="outlined"
+          color="primary"
+          size="large"
+          onClick={onCreateClick}
+          startIcon={content.secondaryIcon}
+          sx={{ 
+            borderRadius: '12px',
+            px: 3,
+            py: 1.5
+          }}
+        >
+          {content.secondaryButton}
+        </Button>
+      </Box>
+      
+      <Box sx={{ mt: 6, p: 3, bgcolor: 'info.50', borderRadius: 2, maxWidth: '600px', mx: 'auto' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+          <MenuBookIcon color="info" />
+          <Typography variant="subtitle1" color="info.main" fontWeight="500">How Quizzes Are Created</Typography>
+        </Box>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1, textAlign: 'left' }}>
+          1. <strong>Upload documents</strong> to study in the platform
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1, textAlign: 'left' }}>
+          2. <strong>Select text</strong> and click "Generate Questions" while reading
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1, textAlign: 'left' }}>
+          3. <strong>Auto-generated quizzes</strong> appear here as you study, organized by subject
+        </Typography>
+      </Box>
+    </Paper>
   );
 };
 

@@ -12,7 +12,8 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions, 
   FormControl, InputLabel, Select, MenuItem, 
   FormGroup, FormControlLabel, Checkbox,
-  Typography, Button, Box, Grid, Paper, IconButton
+  Typography, Button, Box, Grid, Paper, IconButton,
+  CircularProgress
 } from '@mui/material';
 
 // Import icons
@@ -32,6 +33,7 @@ const FilesList = () => {
   const [configDialogOpen, setConfigDialogOpen] = useState(false);
   const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState(null);
+  const [userLoading, setUserLoading] = useState(true);
 
   const handleUpload = () => {
     fileInputRef.current.click();
@@ -43,6 +45,7 @@ const FilesList = () => {
     useEffect(() => {
       const fetchUser = async () => {
         try {
+          setUserLoading(true);
           const token = localStorage.getItem("token");
           if (!token) {
             navigate("/login");
@@ -65,15 +68,18 @@ const FilesList = () => {
           }
   
           const userData = await response.data;
-          // console.log(userData);
-          setCurrentUser(userData); // Update state with fresh data
+          setCurrentUser(userData || { membership: 'free' }); // Ensure we have a default
         } catch (error) {
           console.error("Fetching user error:", error);
+          // Set a default user with free membership if there's an error
+          setCurrentUser({ membership: 'free' });
+        } finally {
+          setUserLoading(false);
         }
       };
   
       fetchUser();
-    }, [location.pathname]);
+    }, [location.pathname, navigate]);
   
 
   // Question generation configuration state
@@ -238,6 +244,14 @@ const FilesList = () => {
     );
   }
 
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen bg-gray-100 p-8 flex justify-center items-center">
+        <div className="text-xl font-semibold text-gray-600">Loading user data...</div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-100 p-8">
       {/* Hidden file input */}
@@ -373,122 +387,130 @@ const FilesList = () => {
           </Typography>
         </DialogTitle>
         
-        <DialogContent dividers>
-          {/* Number of Questions */}
-          <FormControl fullWidth margin="normal">
-            <InputLabel>Number of Questions</InputLabel>
-            <Select
-              value={questionConfig.numQuestions}
-              onChange={(e) => setQuestionConfig({...questionConfig, numQuestions: e.target.value})}
-              disabled={currentUser.membership === 'free'} // Disable selection for free users
-            >
-              <MenuItem value={3}>3 questions</MenuItem>
-              <MenuItem value={5}>5 questions</MenuItem>
-              <MenuItem value={8}>8 questions</MenuItem>
-              <MenuItem value={10}>10 questions</MenuItem>
-            </Select>
-          </FormControl>
+        {userLoading ? (
+          <DialogContent dividers>
+            <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+              <CircularProgress />
+            </Box>
+          </DialogContent>
+        ) : (
+          <DialogContent dividers>
+            {/* Number of Questions */}
+            <FormControl fullWidth margin="normal">
+              <InputLabel>Number of Questions</InputLabel>
+              <Select
+                value={questionConfig.numQuestions}
+                onChange={(e) => setQuestionConfig({...questionConfig, numQuestions: e.target.value})}
+                disabled={currentUser.membership === 'free'} // Disable selection for free users
+              >
+                <MenuItem value={3}>3 questions</MenuItem>
+                <MenuItem value={5}>5 questions</MenuItem>
+                <MenuItem value={8}>8 questions</MenuItem>
+                <MenuItem value={10}>10 questions</MenuItem>
+              </Select>
+            </FormControl>
 
-          {/* Difficulty Selection */}
-          <FormControl fullWidth margin="normal">
-            <InputLabel>Difficulty</InputLabel>
-            <Select
-              value={currentUser.membership === 'free' ? 'medium' : questionConfig.difficulty}
-              onChange={(e) => setQuestionConfig({...questionConfig, difficulty: e.target.value})}
-              disabled={currentUser.membership === 'free'} // Restrict free users
-            >
-              <MenuItem value="easy">Easy</MenuItem>
-              <MenuItem value="medium">Medium</MenuItem>
-              <MenuItem value="hard">Hard</MenuItem>
-              <MenuItem value="mixed">Mixed</MenuItem>
-            </Select>
-          </FormControl>
+            {/* Difficulty Selection */}
+            <FormControl fullWidth margin="normal">
+              <InputLabel>Difficulty</InputLabel>
+              <Select
+                value={currentUser.membership === 'free' ? 'medium' : questionConfig.difficulty}
+                onChange={(e) => setQuestionConfig({...questionConfig, difficulty: e.target.value})}
+                disabled={currentUser.membership === 'free'} // Restrict free users
+              >
+                <MenuItem value="easy">Easy</MenuItem>
+                <MenuItem value="medium">Medium</MenuItem>
+                <MenuItem value="hard">Hard</MenuItem>
+                <MenuItem value="mixed">Mixed</MenuItem>
+              </Select>
+            </FormControl>
 
-          {/* Time Limit */}
-          <FormControl fullWidth margin="normal">
-            <InputLabel>Time Limit</InputLabel>
-            <Select
-              value={questionConfig.timeLimit}
-              onChange={(e) => setQuestionConfig({...questionConfig, timeLimit: e.target.value})}
-            >
-              <MenuItem value={0}>No time limit</MenuItem>
-              <MenuItem value={1}>1 minute</MenuItem>
-              <MenuItem value={5}>5 minutes</MenuItem>
-              <MenuItem value={10}>10 minutes</MenuItem>
-              <MenuItem value={15}>15 minutes</MenuItem>
-              <MenuItem value={30}>30 minutes</MenuItem>
-            </Select>
-          </FormControl>
+            {/* Time Limit */}
+            <FormControl fullWidth margin="normal">
+              <InputLabel>Time Limit</InputLabel>
+              <Select
+                value={questionConfig.timeLimit}
+                onChange={(e) => setQuestionConfig({...questionConfig, timeLimit: e.target.value})}
+              >
+                <MenuItem value={0}>No time limit</MenuItem>
+                <MenuItem value={1}>1 minute</MenuItem>
+                <MenuItem value={5}>5 minutes</MenuItem>
+                <MenuItem value={10}>10 minutes</MenuItem>
+                <MenuItem value={15}>15 minutes</MenuItem>
+                <MenuItem value={30}>30 minutes</MenuItem>
+              </Select>
+            </FormControl>
 
-          <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>
-            Question Types
-          </Typography>
+            <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>
+              Question Types
+            </Typography>
 
-          <FormGroup>
-            {/* Open-Ended (Always Selected for Free Users) */}
-            <FormControlLabel
-              control={
-                <Checkbox 
-                  checked={questionConfig.questionTypes.includes('open-ended')}
-                  onChange={(e) => {
-                    if (currentUser.membership === 'free') return; // Prevent free users from unchecking
-                    const newTypes = e.target.checked
-                      ? [...questionConfig.questionTypes.filter(t => t !== 'mixed'), 'open-ended']
-                      : questionConfig.questionTypes.filter(t => t !== 'open-ended');
-                    setQuestionConfig({...questionConfig, questionTypes: newTypes.length ? newTypes : ['mixed']});
-                  }}
-                />
-              }
-              label="Open Ended"
-            />
+            <FormGroup>
+              {/* Open-Ended (Always Selected for Free Users) */}
+              <FormControlLabel
+                control={
+                  <Checkbox 
+                    checked={questionConfig.questionTypes.includes('open-ended')}
+                    onChange={(e) => {
+                      if (currentUser.membership === 'free') return; // Prevent free users from unchecking
+                      const newTypes = e.target.checked
+                        ? [...questionConfig.questionTypes.filter(t => t !== 'mixed'), 'open-ended']
+                        : questionConfig.questionTypes.filter(t => t !== 'open-ended');
+                      setQuestionConfig({...questionConfig, questionTypes: newTypes.length ? newTypes : ['mixed']});
+                    }}
+                  />
+                }
+                label="Open Ended"
+              />
 
-            {/* Other question types (Disabled for Free Users) */}
-            {/* <FormControlLabel
-              control={
-                <Checkbox 
-                  checked={questionConfig.questionTypes.includes('mcq')}
-                  onChange={(e) => {
-                    const newTypes = e.target.checked
-                      ? [...questionConfig.questionTypes.filter(t => t !== 'mixed'), 'mcq']
-                      : questionConfig.questionTypes.filter(t => t !== 'mcq');
-                    setQuestionConfig({...questionConfig, questionTypes: newTypes.length ? newTypes : ['mixed']});
-                  }}
-                  disabled={currentUser.membership === 'free'}
-                />
-              }
-              label="Multiple Choice"
-            />
+              {/* Other question types (Disabled for Free Users) */}
+              {/* <FormControlLabel
+                control={
+                  <Checkbox 
+                    checked={questionConfig.questionTypes.includes('mcq')}
+                    onChange={(e) => {
+                      const newTypes = e.target.checked
+                        ? [...questionConfig.questionTypes.filter(t => t !== 'mixed'), 'mcq']
+                        : questionConfig.questionTypes.filter(t => t !== 'mcq');
+                      setQuestionConfig({...questionConfig, questionTypes: newTypes.length ? newTypes : ['mixed']});
+                    }}
+                    disabled={currentUser.membership === 'free'}
+                  />
+                }
+                label="Multiple Choice"
+              />
 
-            <FormControlLabel
-              control={
-                <Checkbox 
-                  checked={questionConfig.questionTypes.includes('true-false')}
-                  onChange={(e) => {
-                    const newTypes = e.target.checked
-                      ? [...questionConfig.questionTypes.filter(t => t !== 'mixed'), 'true-false']
-                      : questionConfig.questionTypes.filter(t => t !== 'true-false');
-                    setQuestionConfig({...questionConfig, questionTypes: newTypes.length ? newTypes : ['mixed']});
-                  }}
-                  disabled={currentUser.membership === 'free'}
-                />
-              }
-              label="True/False"
-            />
+              <FormControlLabel
+                control={
+                  <Checkbox 
+                    checked={questionConfig.questionTypes.includes('true-false')}
+                    onChange={(e) => {
+                      const newTypes = e.target.checked
+                        ? [...questionConfig.questionTypes.filter(t => t !== 'mixed'), 'true-false']
+                        : questionConfig.questionTypes.filter(t => t !== 'true-false');
+                      setQuestionConfig({...questionConfig, questionTypes: newTypes.length ? newTypes : ['mixed']});
+                    }}
+                    disabled={currentUser.membership === 'free'}
+                  />
+                }
+                label="True/False"
+              />
 
-            <FormControlLabel
-              control={
-                <Checkbox 
-                  checked={questionConfig.questionTypes.includes('mixed')}
-                  onChange={(e) => {
-                    setQuestionConfig({...questionConfig, questionTypes: e.target.checked ? ['mixed'] : ['open-ended']});
-                  }}
-                  disabled={currentUser.membership === 'free'}
-                />
-              }
-              label="Mixed (All Types)"
-            /> */}
-          </FormGroup> 
-        </DialogContent>
+              <FormControlLabel
+                control={
+                  <Checkbox 
+                    checked={questionConfig.questionTypes.includes('mixed')}
+                    onChange={(e) => {
+                      setQuestionConfig({...questionConfig, questionTypes: e.target.checked ? ['mixed'] : ['open-ended']});
+                    }}
+                    disabled={currentUser.membership === 'free'}
+                  />
+                }
+                label="Mixed (All Types)"
+              /> */}
+            </FormGroup> 
+          </DialogContent>
+        )}
 
         
         <DialogActions>

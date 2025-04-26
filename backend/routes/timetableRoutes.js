@@ -6,7 +6,7 @@ const {
     updateEntry, 
     deleteEntry 
 } = require('../controllers/timetableController');
-const authenticateToken = require("../middleware/authenticate");
+const {authenticateToken} = require("../middleware/authenticate");
 const router = express.Router();
 
 // Create new timetable entry

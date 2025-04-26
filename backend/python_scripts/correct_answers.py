@@ -32,23 +32,70 @@ def parse_questions(questions_str: str) -> List[str]:
     """Safely parse questions from JSON string"""
     try:
         if isinstance(questions_str, str):
-            # Clean the string before parsing
-            cleaned_str = (questions_str
-                         .replace('\\"', '"')        # Fix escaped quotes
-                         .replace('\\n', ' ')        # Replace newlines
-                         .replace('\n', ' ')         # Replace literal newlines
-                         .strip())
+            # Enhanced cleaning for complex escape sequences
+            cleaned_str = questions_str
             
-            # Additional validation for JSON array
-            if not (cleaned_str.startswith('[') and cleaned_str.endswith(']')):
-                raise ValueError("Input must be a JSON array")
-            
-            # Try sanitized parsing first
-            questions = sanitize_and_parse_json(cleaned_str)
-            
-            # Fall back to standard parsing if sanitization failed
-            if not questions:
+            # Try multiple approaches to fix escape sequences
+            try:
+                # First attempt: standard JSON load
                 questions = json.loads(cleaned_str)
+            except json.JSONDecodeError:
+                try:
+                    # Second attempt: replace problematic escape sequences
+                    cleaned_str = (cleaned_str
+                                .replace('\\"', '"')
+                                .replace('\\\\', '\\')
+                                .replace('\\n', ' ')
+                                .replace('\n', ' ')
+                                .strip())
+                    
+                    # Handle raw string literal markers that might be present
+                    if cleaned_str.startswith('r"') or cleaned_str.startswith("r'"):
+                        cleaned_str = cleaned_str[1:]
+                        
+                    questions = json.loads(cleaned_str)
+                except json.JSONDecodeError:
+                    try:
+                        # Third attempt: manually parse the list structure
+                        if cleaned_str.startswith('[') and cleaned_str.endswith(']'):
+                            # Extract individual questions by parsing manually
+                            items = []
+                            current = ""
+                            in_quotes = False
+                            escape_next = False
+                            
+                            for char in cleaned_str[1:-1]:
+                                if escape_next:
+                                    current += char
+                                    escape_next = False
+                                    continue
+                                    
+                                if char == '\\':
+                                    escape_next = True
+                                    current += char
+                                elif char == '"' and not escape_next:
+                                    in_quotes = not in_quotes
+                                    current += char
+                                elif char == ',' and not in_quotes:
+                                    items.append(current.strip())
+                                    current = ""
+                                else:
+                                    current += char
+                                    
+                            if current:
+                                items.append(current.strip())
+                                
+                            questions = [item.strip('"') for item in items]
+                        else:
+                            # Single question case
+                            questions = [cleaned_str]
+                    except Exception as e:
+                        print(f"Manual parsing failed: {e}", file=sys.stderr)
+                        # Last resort: just split by comma if it looks like a list
+                        if cleaned_str.startswith('[') and cleaned_str.endswith(']'):
+                            questions = [q.strip(' "\'') for q in cleaned_str[1:-1].split(',')]
+                        else:
+                            questions = [cleaned_str]
             
             # Clean individual questions
             questions = [q.replace('\n', ' ').strip() for q in questions if q]
@@ -58,6 +105,21 @@ def parse_questions(questions_str: str) -> List[str]:
     except json.JSONDecodeError as e:
         print(f"Error parsing questions JSON: {e}", file=sys.stderr)
         print(f"Problematic input: {questions_str}", file=sys.stderr)
+        # Add enhanced recovery - try to extract questions even if JSON is malformed
+        try:
+            if isinstance(questions_str, str) and '[' in questions_str and ']' in questions_str:
+                # Extract content between first [ and last ]
+                content = questions_str[questions_str.find('[')+1:questions_str.rfind(']')]
+                # Attempt to split by quote-comma-quote pattern
+                import re
+                questions = re.split(r'",\s*"', content)
+                questions = [q.strip('"\'') for q in questions]
+                if questions:
+                    print(f"Recovered {len(questions)} questions through fallback method", file=sys.stderr)
+                    return questions
+        except Exception as recovery_error:
+            print(f"Recovery attempt failed: {recovery_error}", file=sys.stderr)
+        
         raise ValueError(f"Invalid questions format: {e}")
 
 def correct_answer_handler(input_text: str, questions: Union[str, List[str]]) -> List[str]:

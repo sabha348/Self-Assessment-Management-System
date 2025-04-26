@@ -7,6 +7,8 @@ import { defaultLayoutPlugin } from '@react-pdf-viewer/default-layout';
 import { thumbnailPlugin } from '@react-pdf-viewer/thumbnail';
 import { jwtDecode } from 'jwt-decode';
 
+
+
 // Import styles
 import '@react-pdf-viewer/core/lib/styles/index.css';
 import '@react-pdf-viewer/default-layout/lib/styles/index.css';
@@ -67,6 +69,8 @@ const PdfViewer = () => {
   // Create the plugins
   const defaultLayoutPluginInstance = defaultLayoutPlugin();
   const thumbnailPluginInstance = thumbnailPlugin();
+
+  
 
   useEffect(() => {
     const handleTextSelection = () => {
@@ -873,6 +877,7 @@ useEffect(() => {
   };
 }, [userId, notificationIgnored]); // Remove lastActiveTimestamp from dependencies
 
+
   return (
     <div className="min-h-screen bg-gray-100 p-8">
       {/* Add Toaster component */}
@@ -1113,15 +1118,16 @@ useEffect(() => {
       )}
 
       <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="bg-white rounded-lg shadow-sm p-4 mb-4 flex justify-between items-center sticky top-0 z-10">
+         <div className="bg-white rounded-lg shadow-sm p-4 mb-4 flex justify-between items-center sticky top-0 z-10">
           <h1 className="text-xl font-semibold">{title || 'PDF Viewer'}</h1>
-          <button 
-            onClick={() => navigate('/dashboard')}
-            className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg"
-          >
-            Back to Dashboard
-          </button>
+          <div className="flex space-x-4">
+            <button 
+              onClick={() => navigate('/dashboard')}
+              className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg"
+            >
+              Back to Dashboard
+            </button>
+          </div>
         </div>
 
         {/* Floating Button */}

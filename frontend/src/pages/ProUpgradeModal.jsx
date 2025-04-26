@@ -19,6 +19,8 @@ const ProUpgradeModal = () => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
+      console.log("data is",data);
+
       if (data.url) {
         window.location.href = data.url; // Redirect to Stripe Checkout
       }

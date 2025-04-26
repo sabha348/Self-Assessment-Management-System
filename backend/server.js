@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require("express");
 const cors = require("cors");
 const bodyParser = require("body-parser");
@@ -8,6 +9,7 @@ const timetableRoutes = require('./routes/timetableRoutes');
 const assessmentRoutes = require('./routes/assessmentRouter');
 const registerUser = require('./authentication/register');
 const loginUser = require('./authentication/login'); 
+const adminRoutes = require('./routes/adminRoutes');
 const { upload, uploadFile, getFiles } = require('./services/fileService');
 const quizRouter = require('./routes/quizRouter');
 const masteryRouter = require('./routes/masteryRouter'); // Add this line with your other router imports
@@ -15,7 +17,11 @@ const userAnalyticsRouter = require('./routes/userAnalyticsRouter'); // Add this
 const mongoose = require('mongoose');
 // const upgradeMembership = require('./routes/membership');
 const paymentRoutes = require('./routes/paymentRouter'); 
+const helpRequestRouter = require('./routes/helpRequestRouter'); // Add this line with your other router imports and registrations
+const errorRoutes = require('./routes/errorRoutes'); // Add this line with your other router imports
 
+// Add this after all your route imports
+const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
 const port = process.env.PORT || 8000; // Changed port to 8000
@@ -26,21 +32,25 @@ connectDB();
 // Middleware
 app.use(cors({
   origin: "http://localhost:3000",
-  methods: ["GET", "POST", "PUT", "DELETE"],
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
   allowedHeaders: ["Content-Type", "Authorization"]
 }));
 
+// Add this line before your routes
+app.use(express.static('public'));
 
 // app.use(cors({
 //   origin: "http://localhost:3000", // Replace with your frontend URL
 //   methods: "GET,POST,PUT, DELETE, OPTIONS",
 //   credentials: true
 // }));
-
+// Then in server.js:
 app.use(bodyParser.json());
 // Update body-parser configuration with increased limits
 app.use(express.json({ limit: '100mb' })); // Increased from 50mb to 100mb
 app.use(express.urlencoded({ limit: '100mb', extended: true, parameterLimit: 100000 })); // Added parameterLimit
+
+app.use('/api', helpRequestRouter); // Add this line with your other app.use statements
 
 // Routes
 app.use('/api/assessment', assessmentRoutes);
@@ -51,10 +61,13 @@ app.use('/api/files', fileRoutes);
 app.use('/api/timetable', timetableRoutes); // Keeping this existing route
 app.use('/api/quizzes', quizRouter); // Added new quiz router
 app.use('/api/payment',paymentRoutes);
+app.use('/api/admin', adminRoutes);
 
 // app.use('/api/membership/upgrade',upgradeMembership);
 app.use('/api/mastery', masteryRouter); // Add this line with your other app.use statements
 app.use('/api/user-analytics', userAnalyticsRouter); // Add this with your other app.use statements
+app.use('/api/errors', errorRoutes); // Add this with your other routes
+
 
 // Test route
 app.get('/api/test', (req, res) => {
@@ -71,6 +84,9 @@ app.use((err, req, res, next) => {
     details: process.env.NODE_ENV === 'development' ? err.stack : undefined
   });
 });
+
+// Add this after all your app.use() routes but before app.listen()
+app.use(errorHandler);
 
 app.listen(port, () => {
   console.log(`Assessment server running on port ${port}`);

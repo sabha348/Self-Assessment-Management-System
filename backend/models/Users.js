@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const bcrypt = require('bcrypt');
 
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true },
@@ -15,6 +16,7 @@ const userSchema = new mongoose.Schema({
   membershipExpiry: Date, //  Store expiry date for paid plans 
   stripeCustomerId: { type: String }, // Store Stripe customer ID
   stripePaymentId: { type: String }, // Store Stripe payment ID for one-time purchase
+  lastLogin: { type: Date },
   createdAt: { type: Date, default: Date.now },
   preferences: {
     questionConfig: {
@@ -25,5 +27,22 @@ const userSchema = new mongoose.Schema({
     }
   }
 });
+
+// userSchema.pre('save', async function(next) {
+//   // Only hash the password if it has been modified (or is new)
+//   if (!this.isModified('password')) return next();
+  
+//   try {
+//     const salt = await bcrypt.genSalt(10);
+//     this.password = await bcrypt.hash(this.password, salt);
+//     next();
+//   } catch (error) {
+//     next(error);
+//   }
+// });
+
+// userSchema.methods.comparePassword = async function(candidatePassword) {
+//   return bcrypt.compare(candidatePassword, this.password);
+// };
 
 module.exports = mongoose.model('User', userSchema);

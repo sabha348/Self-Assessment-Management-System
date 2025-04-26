@@ -223,7 +223,6 @@ router.post("/:quizId/submit", async (req, res) => {
       return res.status(404).json({ error: "Questions not found for the quiz" });
     }
 
-    console.log('questions:', questions);
     // Format data for evaluation
     let questionsData = [];
     let userAnswersData = [];
@@ -232,22 +231,64 @@ router.post("/:quizId/submit", async (req, res) => {
     // Convert answers object to array format
     const answersArray = Object.values(answers);
 
-    // Now the questions are in the correct order, match answers accordingly
+    // Check if we have correct answers in the database, and if not, generate them on-demand
+    let missingCorrectAnswers = false;
+    const questionsWithoutAnswers = questions.filter(q => !q.correctAnswer || q.correctAnswer === 'Unable to generate answer');
+    
+    if (questionsWithoutAnswers.length > 0) {
+      console.log(`Found ${questionsWithoutAnswers.length} questions without correct answers. Generating them now.`);
+      missingCorrectAnswers = true;
+      
+      try {
+        // On-demand generation of correct answers
+        const correctAnswers = await runPythonProcess("./python_scripts/correct_answers.py", [
+          quiz.content,
+          JSON.stringify(questionsWithoutAnswers.map(q => q.question))
+        ]);
+        
+        if (Array.isArray(correctAnswers)) {
+          // Update the questions in the database with the newly generated answers
+          const updatePromises = questionsWithoutAnswers.map((question, idx) => {
+            return Question.findByIdAndUpdate(
+              question._id,
+              { correctAnswer: correctAnswers[idx] || "No answer available" }
+            );
+          });
+          
+          await Promise.all(updatePromises);
+          console.log("Successfully generated missing correct answers");
+          
+          // Refresh the questions with the newly added answers
+          const updatedQuestions = await Question.find({ quizeRef: quizId })
+            .sort({ position: 1 });
+          
+          questions.forEach((q, idx) => {
+            const updatedQ = updatedQuestions.find(uq => uq._id.toString() === q._id.toString());
+            if (updatedQ && updatedQ.correctAnswer) {
+              questions[idx].correctAnswer = updatedQ.correctAnswer;
+            }
+          });
+        }
+      } catch (error) {
+        console.error("Failed to generate missing correct answers:", error);
+        // Continue with the available correct answers
+      }
+    }
+
+    // Now match the questions with answers
     questions.forEach((question, index) => {
       if (answersArray[index]) {
         questionsData.push(question.question);
         userAnswersData.push(answersArray[index]);
-        correctAnswersData.push(question.correctAnswer);
+        correctAnswersData.push(question.correctAnswer || "No answer available");
       }
     });        
 
-    
     // Prepare evaluation data
     const evalData = {
       answers: userAnswersData,
       correct_answers: correctAnswersData
     };
-    console.log('evaldata:',evalData);
 
     try {
       const results = await runPythonProcess("./python_scripts/evaluate_answers.py", [

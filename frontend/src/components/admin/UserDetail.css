@@ -1,0 +1,182 @@
+.user-detail {
+  padding: 20px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 25px;
+}
+
+.btn-back {
+  background-color: #f0f0f0;
+  border: none;
+  padding: 8px 15px;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-right: 15px;
+  font-weight: 500;
+}
+
+.loading, .error {
+  text-align: center;
+  padding: 30px;
+  font-size: 18px;
+}
+
+.error {
+  color: #d32f2f;
+}
+
+.user-profile {
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding: 25px;
+}
+
+.profile-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 30px;
+  position: relative;
+}
+
+.avatar {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  background-color: #3f51b5;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  margin-right: 20px;
+}
+
+.user-info h2 {
+  margin: 0 0 5px 0;
+  font-size: 24px;
+}
+
+.email {
+  color: #666;
+  margin: 0 0 10px 0;
+}
+
+.badges {
+  display: flex;
+  gap: 8px;
+}
+
+.badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.badge.admin {
+  background-color: #ffd3e0;
+  color: #d81b60;
+}
+
+.badge.user {
+  background-color: #e0f2f1;
+  color: #00897b;
+}
+
+.badge.subscription {
+  background-color: #fff8e1;
+  color: #ff8f00;
+}
+
+.header-actions {
+  position: absolute;
+  right: 0;
+  top: 0;
+}
+
+.btn {
+  padding: 8px 15px;
+  border-radius: 4px;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.btn-secondary {
+  background-color: #f0f0f0;
+  color: #333;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 15px;
+  margin-bottom: 30px;
+}
+
+.stat-card {
+  background-color: #f5f5f5;
+  border-radius: 6px;
+  padding: 15px;
+  text-align: center;
+}
+
+.stat-card h3 {
+  margin: 0 0 10px 0;
+  font-size: 14px;
+  color: #666;
+  text-transform: uppercase;
+}
+
+.stat-value {
+  font-size: 20px;
+  font-weight: bold;
+}
+
+.user-activity {
+  background-color: #f5f5f5;
+  border-radius: 6px;
+  padding: 20px;
+}
+
+.user-activity h3 {
+  margin-top: 0;
+  margin-bottom: 15px;
+}
+
+.placeholder {
+  color: #666;
+  font-style: italic;
+  text-align: center;
+  padding: 20px;
+}
+
+@media (max-width: 768px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .profile-header {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .avatar {
+    margin-right: 0;
+    margin-bottom: 15px;
+  }
+  
+  .header-actions {
+    position: static;
+    margin-top: 15px;
+  }
+}

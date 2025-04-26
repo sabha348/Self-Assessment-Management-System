@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { getFiles, getFileById, uploadFile, deleteFile, upload } = require('../services/fileService');
-const authenticateToken = require('../middleware/authenticate');
+const {authenticateToken} = require('../middleware/authenticate');
 
 
 // Protect file upload and deletion routes

@@ -239,7 +239,11 @@ const Assessment = () => {
         
         console.log('Fetching questions from endpoint:', endpoint);
         
-        const response = await axios.get(`http://localhost:8000${endpoint}`);
+        const response = await axios.get(`http://localhost:8000${endpoint}`,{
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
         // The response structure might be different depending on the endpoint
         // Make sure we handle all possible structures
         if (response.data.questions && Array.isArray(response.data.questions)) {
