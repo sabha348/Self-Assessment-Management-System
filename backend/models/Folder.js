@@ -1,29 +1,21 @@
 const mongoose = require('mongoose');
 
-const documentSchema = new mongoose.Schema({
-  title: {
+const folderSchema = new mongoose.Schema({
+  name: {
     type: String,
     required: true,
     trim: true
   },
-  content: {
-    type: String,
-    required: true
-  },
-  fileType: {
-    type: String,
-    default: 'PDF'
-  },
-  uploadedBy: {
+  createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true
   },
-  folderId: {
+  parentId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Folder',
     default: null
   }
 }, { timestamps: true });
 
-module.exports = mongoose.model('Document', documentSchema);
+module.exports = mongoose.model('Folder', folderSchema);

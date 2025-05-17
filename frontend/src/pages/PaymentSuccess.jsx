@@ -8,6 +8,7 @@ const PaymentSuccess = () => {
     const sessionId = searchParams.get("session_id");
     const [message, setMessage] = useState("");
     const [status, setStatus] = useState("processing");
+    const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
     useEffect(() => {
         if (sessionId) {
@@ -22,7 +23,7 @@ const PaymentSuccess = () => {
     const confirmPayment = async () => {
         try {
             const { data } = await axios.post(
-                "http://localhost:8000/api/payment/confirm-payment",
+                `${API_URL}/payment/confirm-payment`,
                 { session_id: sessionId },
                 {
                     headers: {

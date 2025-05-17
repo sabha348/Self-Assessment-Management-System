@@ -1,9 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import axios from 'axios';
 
-const api = axios.create({
-    baseURL: 'http://localhost:8000',  // Your API server URL
-  });
 
 const AuthContext = createContext();
 
@@ -14,6 +11,7 @@ export const AuthProvider = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
   useEffect(() => {
     // Check if user is logged in on initial load
@@ -26,7 +24,7 @@ export const AuthProvider = ({ children }) => {
       }
       
       try {
-        const response = await axios.get('http://localhost:8000/user/me', {
+        const response = await axios.get(`${API_URL}/user/me`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         
@@ -46,7 +44,7 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     try {
       setError(null);
-      const response = await axios.post('/api/auth/login', { email, password });
+      const response = await axios.post(`${API_URL}/auth/login`, { email, password });
       const { token, user } = response.data;
       
       localStorage.setItem('token', token);
@@ -68,7 +66,7 @@ export const AuthProvider = ({ children }) => {
   const register = async (userData) => {
     try {
       setError(null);
-      const response = await axios.post('/api/auth/register', userData);
+      const response = await axios.post(`${API_URL}/auth/register`, userData);
       return response.data;
     } catch (err) {
       setError(err.response?.data?.message || 'Registration failed');

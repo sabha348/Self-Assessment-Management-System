@@ -19,6 +19,7 @@ const Account = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [helpMessage, setHelpMessage] = useState('');
   const [showCancelSubscriptionConfirm, setShowCancelSubscriptionConfirm] = useState(false);
+  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -34,7 +35,7 @@ const Account = () => {
         const userId = decoded.userId;
 
         // Fetch user data
-        const response = await axios.get(`http://localhost:8000/user/${userId}`, {
+        const response = await axios.get(`${API_URL}/user/${userId}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
 
@@ -66,7 +67,7 @@ const Account = () => {
     e.preventDefault();
     try {
       const token = localStorage.getItem('token');
-      await axios.put(`http://localhost:8000/user/${user._id}`, 
+      await axios.put(`${API_URL}/user/${user._id}`, 
         { email: formData.email },
         { headers: { Authorization: `Bearer ${token}` }}
       );
@@ -89,7 +90,7 @@ const Account = () => {
 
     try {
       const token = localStorage.getItem('token');
-      await axios.post(`http://localhost:8000/user/change-password`, 
+      await axios.post(`${API_URL}/user/change-password`, 
         { 
           currentPassword: formData.currentPassword,
           newPassword: formData.newPassword 
@@ -114,7 +115,7 @@ const Account = () => {
       const token = localStorage.getItem('token');
       
       // Send deletion request with notification to admin
-      await axios.delete(`http://localhost:8000/user/${user._id}`, {
+      await axios.delete(`${API_URL}/user/${user._id}`, {
         headers: { Authorization: `Bearer ${token}` },
         data: { 
           notifyAdmin: true, 
@@ -140,7 +141,7 @@ const Account = () => {
     
     try {
       const token = localStorage.getItem('token');
-      await axios.post(`http://localhost:8000/api/help-request`, { 
+      await axios.post(`${API_URL}/help-request`, { 
         message: helpMessage,
         userName: user.name,
         userEmail: user.email,
@@ -161,7 +162,7 @@ const Account = () => {
       const token = localStorage.getItem('token');
       
       const response = await axios.post(
-        `http://localhost:8000/api/payment/subscription/cancel`, 
+        `${API_URL}/payment/subscription/cancel`, 
         { userId: user._id },
         { headers: { Authorization: `Bearer ${token}` }}
       );

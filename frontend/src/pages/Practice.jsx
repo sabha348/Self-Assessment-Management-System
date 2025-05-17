@@ -2,11 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { 
   Container, 
-  Grid2, 
-  Card, 
-  CardActionArea, 
-  CardContent, 
-  CardMedia, 
   Typography, 
   Box, 
   CircularProgress,
@@ -19,10 +14,8 @@ import {
   Paper,
   Fade,
   Chip,
-  LinearProgress,
   Tooltip,
   IconButton,
-  CardActions,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -31,12 +24,19 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  FormLabel,
-  FormGroup,
   FormControlLabel,
   Checkbox,
   Switch,
   TextField,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemIcon,
+  ListItemSecondaryAction,
+  Divider,
+  Avatar,
+  useTheme,
+  alpha
 } from '@mui/material';
 
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
@@ -46,92 +46,290 @@ import InfoIcon from '@mui/icons-material/Info';
 import QuizIcon from '@mui/icons-material/Quiz';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import ListIcon from '@mui/icons-material/List'; // Added missing icon
-import EditIcon from '@mui/icons-material/Edit';
+import ListIcon from '@mui/icons-material/List';
 import SaveIcon from '@mui/icons-material/Save';
 import CancelIcon from '@mui/icons-material/Cancel';
 import DeleteIcon from '@mui/icons-material/Delete';
-import AddIcon from '@mui/icons-material/Add';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
-import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
-import MenuBookIcon from '@mui/icons-material/MenuBook';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import FunctionsIcon from '@mui/icons-material/Functions';
+import ScienceIcon from '@mui/icons-material/Science';
+import BiotechIcon from '@mui/icons-material/Biotech';
+import AutoStoriesIcon from '@mui/icons-material/AutoStories';
+import HistoryEduIcon from '@mui/icons-material/HistoryEdu';
+import PublicIcon from '@mui/icons-material/Public';
+import ComputerIcon from '@mui/icons-material/Computer';
+import SchoolIcon from '@mui/icons-material/School';
+import CalculateIcon from '@mui/icons-material/Calculate';
+import FunctionsOutlinedIcon from '@mui/icons-material/FunctionsOutlined';
+import ArchitectureIcon from '@mui/icons-material/Architecture';
+import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
+import AddIcon from '@mui/icons-material/Add';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import { styled } from '@mui/material/styles';
-import { useNavigate, useLocation } from 'react-router-dom';
-// Comment out ForceGraph if you're not using it yet
-// import { ForceGraph2D } from 'react-force-graph';
+import { useNavigate } from 'react-router-dom';
+import Joyride from 'react-joyride';
 
-// Styled components
-const StyledCard = styled(Card)(({ theme }) => ({
-  height: '100%',
-  display: 'flex',
-  flexDirection: 'column',
-  transition: 'all 0.3s ease-in-out',
-  borderRadius: theme.spacing(2),
+// Styled components with improved animations and layout
+const ContentWrapper = styled(Box)(({ theme }) => ({
+  background: 'linear-gradient(145deg, #f5f7fa 0%, #e4e9f2 100%)',
+  minHeight: '100vh',
+  padding: theme.spacing(3, 2),
+}));
+
+const CompactListItem = styled(ListItem)(({ theme }) => ({
+  borderRadius: theme.spacing(1),
+  marginBottom: theme.spacing(0.75),
+  padding: theme.spacing(1, 2),
+  transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+  backgroundColor: theme.palette.background.paper,
+  position: 'relative',
   overflow: 'hidden',
+  boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
   '&:hover': {
-    transform: 'translateY(-8px)',
-    boxShadow: theme.shadows[8],
-    '& .MuiCardMedia-root': {
-      transform: 'scale(1.05)',
+    backgroundColor: alpha(theme.palette.primary.light, 0.07),
+    transform: 'translateX(4px)',
+    boxShadow: '0 3px 5px rgba(0,0,0,0.08)',
+    '& .MuiListItemSecondaryAction-root': {
+      opacity: 1,
+      transform: 'translateX(0)',
+    },
+    '&::before': {
+      opacity: 1,
+      transform: 'translateX(0)',
     }
   },
+  '&::before': {
+    content: '""',
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    height: '100%',
+    width: '4px',
+    backgroundColor: theme.palette.primary.main,
+    opacity: 0.5,
+    transform: 'translateX(-2px)',
+    transition: 'opacity 0.3s ease, transform 0.3s ease',
+  }
 }));
 
 const StyledAccordion = styled(Accordion)(({ theme }) => ({
   borderRadius: theme.spacing(1),
+  overflow: 'hidden',
+  boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+  transition: 'box-shadow 0.2s ease, transform 0.2s ease',
+  '&:hover': {
+    boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
+  },
   '&:before': {
     display: 'none',
   },
   '&.Mui-expanded': {
     margin: '8px 0',
+    transform: 'scale(1.005)',
   }
 }));
 
-const ContentWrapper = styled(Box)(({ theme }) => ({
-  background: 'linear-gradient(145deg, #f5f7fa 0%, #e4e9f2 100%)',
-  minHeight: '100vh',
-  padding: theme.spacing(4, 2),
+const CategoryIconWrapper = styled(Avatar)(({ theme, categorytype }) => ({
+  backgroundColor: 
+    categorytype === 'subject' ? theme.palette.primary.main :
+    categorytype === 'topic' ? theme.palette.secondary.main :
+    categorytype === 'subtopic' ? theme.palette.success.main :
+    theme.palette.info.main,
+  width: 32,
+  height: 32,
+  transform: 'scale(0.95)',
+  transition: 'transform 0.2s ease',
+  '${CompactListItem}:hover &': {
+    transform: 'scale(1)'
+  }
 }));
 
-// Subject to image mapping
-const subjectImages = {
-  "Mathematics": "https://images.unsplash.com/photo-1596495577886-d920f1fb7238?q=80&w=500&auto=format",
-  "Physics": "https://images.unsplash.com/photo-1636466497217-26a8cbeaf0aa?q=80&w=500&auto=format",
-  "Biology": "https://images.unsplash.com/photo-1530026405186-ed1f139313f8?q=80&w=500&auto=format",
-  "Chemistry": "https://images.unsplash.com/photo-1603126857599-f6e157fa2fe6?q=80&w=500&auto=format",
-  "Literature": "https://images.unsplash.com/photo-1457369804613-52c61a468e7d?q=80&w=500&auto=format",
-  "History": "https://images.unsplash.com/photo-1461360370896-922624d12aa1?q=80&w=500&auto=format",
-  "Geography": "https://images.unsplash.com/photo-1566837945700-30057527ade0?q=80&w=500&auto=format",
-  "Computer Science": "https://images.unsplash.com/photo-1542831371-29b0f74f9713?q=80&w=500&auto=format",
-  "Knowledge": "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?q=80&w=500&auto=format",
+const ActionButtonsWrapper = styled(Box)(({ theme }) => ({
+  opacity: 0.6,
+  transition: 'all 0.3s ease',
+  transform: 'translateX(10px)',
+  '&:hover': {
+    opacity: 1,
+  }
+}));
+
+const AnimatedSection = styled(Paper)(({ theme }) => ({
+  transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+  '&:hover': {
+    boxShadow: theme.shadows[3],
+    transform: 'translateY(-1px)'
+  }
+}));
+
+// Subject to icon mapping
+const subjectIcons = {
+  "Mathematics": <FunctionsIcon fontSize="small" />,
+  "Physics": <ScienceIcon fontSize="small" />,
+  "Biology": <BiotechIcon fontSize="small" />,
+  "Chemistry": <ScienceIcon fontSize="small" />,
+  "Literature": <AutoStoriesIcon fontSize="small" />,
+  "History": <HistoryEduIcon fontSize="small" />,
+  "Geography": <PublicIcon fontSize="small" />,
+  "Computer Science": <ComputerIcon fontSize="small" />,
+  "Knowledge": <SchoolIcon fontSize="small" />,
 };
 
-// Topic to image mapping
-const topicImages = {
-  "Calculus": "https://images.unsplash.com/photo-1635070041078-e363dbe005cb?q=80&w=500&auto=format",
-  "Algebra": "https://images.unsplash.com/photo-1509228627152-72ae9ae6848d?q=80&w=500&auto=format",
-  "Geometry": "https://images.unsplash.com/photo-1560785496-3c9d27877182?q=80&w=500&auto=format",
+// Topic to icon mapping
+const topicIcons = {
+  "Calculus": <CalculateIcon fontSize="small" />,
+  "Algebra": <FunctionsOutlinedIcon fontSize="small" />,
+  "Geometry": <ArchitectureIcon fontSize="small" />,
 };
 
-// Subtopic to image mapping
-const subtopicImages = {
-  "Calculus": "https://images.unsplash.com/photo-1635070041078-e363dbe005cb?q=80&w=500&auto=format",
-  "Algebra": "https://images.unsplash.com/photo-1509228627152-72ae9ae6848d?q=80&w=500&auto=format",
-  "Geometry": "https://images.unsplash.com/photo-1560785496-3c9d27877182?q=80&w=500&auto=format",
+// Default icons by level
+const getDefaultIcon = (level) => {
+  switch (level) {
+    case 'subject': return <SchoolIcon fontSize="small" />;
+    case 'topic': return <ListIcon fontSize="small" />;
+    case 'subtopic': return <InfoIcon fontSize="small" />;
+    case 'concept': return <QuizIcon fontSize="small" />;
+    default: return <InfoIcon fontSize="small" />;
+  }
 };
 
-// Concept to image mapping
-const conceptImages = {
-  "Linear Equations": "https://images.unsplash.com/photo-1509228468518-180dd4864904?q=80&w=500&auto=format",
-  "Differential Calculus": "https://images.unsplash.com/photo-1635070041078-e363dbe005cb?q=80&w=500&auto=format",
-  "Quadratic Formula": "https://images.unsplash.com/photo-1509228627152-72ae9ae6848d?q=80&w=500&auto=format",
+// Get appropriate icon for item
+const getCategoryIcon = (item, level) => {
+  if (level === 'subject') {
+    return subjectIcons[item] || getDefaultIcon(level);
+  } else if (level === 'topic') {
+    return topicIcons[item] || getDefaultIcon(level);
+  } else {
+    return getDefaultIcon(level);
+  }
 };
 
-// Default images
-const defaultSubjectImage = "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?q=80&w=500&auto=format";
-const defaultTopicImage = "https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?q=80&w=500&auto=format";
-const defaultSubtopicImage = "https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?q=80&w=500&auto=format";
-const defaultConceptImage = "https://images.unsplash.com/photo-1544256718-3bcf237f3974?q=80&w=500&auto=format";
+const CategoryListItem = ({ 
+  item, 
+  itemType, 
+  onItemClick, 
+  onExplore,
+  onPractice,
+  onDelete,
+  editMode,
+  editingName,
+  newName,
+  setNewName,
+  startEditing,
+  saveRename,
+  cancelEditing,
+  showExplore = true,
+  className = ''
+}) => {
+  const theme = useTheme();
+  return (
+    <CompactListItem
+      button
+      onClick={() => onItemClick(item)}
+      className={className}
+    >
+      <ListItemIcon sx={{ minWidth: 40 }}>
+        <CategoryIconWrapper categorytype={itemType}>
+          {getCategoryIcon(item, itemType)}
+        </CategoryIconWrapper>
+      </ListItemIcon>
+      
+      <ListItemText 
+        primary={
+          <Typography variant="body1" component="div" sx={{ 
+            fontWeight: 500,
+            transition: 'color 0.2s ease',
+            '&:hover': { color: theme.palette.primary.main }
+          }}>
+            {editMode && editingName === item ? (
+              <Box 
+                sx={{ display: 'flex', alignItems: 'center', width: '80%' }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <TextField
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  variant="outlined"
+                  size="small"
+                  sx={{ flexGrow: 1 }}
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') saveRename();
+                    if (e.key === 'Escape') cancelEditing();
+                  }}
+                />
+              </Box>
+            ) : item}
+          </Typography>
+        }
+        sx={{ margin: 0 }}
+      />
+      
+      {/* Show either action buttons OR edit controls */}
+      <ListItemSecondaryAction>
+        {editMode && editingName === item ? (
+          <Box sx={{ display: 'flex' }}>
+            <IconButton size="small" color="primary" onClick={saveRename} disabled={!newName || newName.trim() === ''}>
+              <SaveIcon fontSize="small" />
+            </IconButton>
+            <IconButton size="small" onClick={cancelEditing}>
+              <CancelIcon fontSize="small" />
+            </IconButton>
+          </Box>
+        ) : (
+          <ActionButtonsWrapper>
+            
+            <Tooltip title="Practice">
+              <IconButton 
+                edge="end" 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onPractice(item, itemType);
+                }}
+                color="secondary"
+                size="small"
+                className="practice-button"
+                sx={{ ml: 0.5 }}
+              >
+                <QuizIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            
+            <Tooltip title="Edit">
+              <IconButton 
+                edge="end" 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  startEditing(item);
+                }}
+                size="small"
+                sx={{ ml: 0.5 }}
+              >
+                <EditIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            
+            <Tooltip title="Delete">
+              <IconButton 
+                edge="end" 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(item, itemType);
+                }}
+                color="error"
+                size="small"
+                sx={{ ml: 0.5 }}
+              >
+                <DeleteIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </ActionButtonsWrapper>
+        )}
+      </ListItemSecondaryAction>
+    </CompactListItem>
+  );
+};
 
 const Practice = () => {
   const [subjects, setSubjects] = useState([]);
@@ -147,190 +345,195 @@ const Practice = () => {
   const [error, setError] = useState(null);
   const [loadingQuestions, setLoadingQuestions] = useState(false);
   const [questionError, setQuestionError] = useState(null);
-  const [progress, setProgress] = useState(0);
   const [assessmentConfigOpen, setAssessmentConfigOpen] = useState(false);
   const [assessmentConfigItem, setAssessmentConfigItem] = useState(null);
   const [assessmentConfigLevel, setAssessmentConfigLevel] = useState(null);
-  
-  // Add missing state variables
-  const [topicProgress, setTopicProgress] = useState({}); // Progress tracking for topics
-  const [recommendedItems, setRecommendedItems] = useState([]); // Recommended items
-  
+  const [runTour, setRunTour] = useState(false);
+  const [steps] = useState([
+    {
+      target: '.subject-card',
+      content: 'Click on a subject to navigate through topics, subtopics, and concepts. This helps you dive deeper into specific areas and find related questions for revision.',
+      title: 'Explore Knowledge Hierarchy',
+      disableBeacon: true,
+      placement: 'bottom'
+    },
+    {
+      target: '.practice-button',
+      content: 'Take assessments at any level - subject, topic, subtopic, or concept. Configure the number of questions, difficulty level, time limit, and more to customize your practice experience.',
+      title: 'Practice with Assessments',
+      placement: 'top'
+    }
+  ]);
+
   const [editMode, setEditMode] = useState(false);
   const [editingName, setEditingName] = useState(null);
   const [newName, setNewName] = useState('');
   
-  const navigate = useNavigate();
-  const location = useLocation();
+  const [editQuestionModal, setEditQuestionModal] = useState(false);
+  const [currentEditQuestion, setCurrentEditQuestion] = useState(null);
+  const [editQuestionForm, setEditQuestionForm] = useState({
+    questionText: '',
+    correctAnswer: '',
+    options: []
+  });
   
-  // Define missing constants
-  const defaultImage = "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?q=80&w=500&auto=format";
+  const navigate = useNavigate();
+  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
-  // Memoized fetch functions
-  const fetchSubjects = useCallback(async () => {
-    try {
-      setLoading(true);
-      setProgress(30);
+  // Check if user has seen this tour before
+  useEffect(() => {
+    const hasSeenTour = localStorage.getItem('hasSeenPracticeTour');
+    if (!hasSeenTour) {
+      // Short delay to ensure components are rendered
+      const timer = setTimeout(() => {
+        setRunTour(true);
+      }, 1000);
       
-      // Get the token from localStorage
-      const token = localStorage.getItem('token');
-      
-      const response = await axios.get('http://localhost:8000/api/quizzes/subjects', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      console.log('Subjects response:', response.data);
-      setSubjects(response.data.subjects || []);
-      setProgress(100);
-    } catch (err) {
-      console.error('Error fetching subjects:', err);
-      setError('Failed to load subjects');
-      setSubjects([]);
-    } finally {
-      setLoading(false);
-      setProgress(0);
+      return () => clearTimeout(timer);
     }
   }, []);
 
-  // Update fetchTopics to match case-insensitively
-  const fetchTopics = useCallback(async (subject) => {
-    try {
-      setLoading(true);
-      setProgress(30);
-      console.log(`Fetching topics for subject: ${subject}`);
-      
-      // Get the token from localStorage
-      const token = localStorage.getItem('token');
-      
-      const response = await axios.get(`http://localhost:8000/api/quizzes/topics/${encodeURIComponent(subject)}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      console.log('Topics response:', response.data);
-      setTopics(response.data.topics || []);
-      setProgress(100);
-    } catch (err) {
-      console.error(`Failed to load topics for ${subject}:`, err);
-      setError(`Failed to load topics for ${subject}`);
-      setTopics([]);
-    } finally {
-      setLoading(false);
-      setProgress(0);
+  // Joyride callback handler
+  const handleJoyrideCallback = (data) => {
+    const { status } = data;
+    if (status === 'finished' || status === 'skipped') {
+      setRunTour(false);
+      // Save that user has seen the tour
+      localStorage.setItem('hasSeenPracticeTour', 'true');
     }
-  }, []);
-
-  // Update fetchSubtopics to match case-insensitively  
-  const fetchSubtopics = useCallback(async (topic) => {
+  };
+  
+  // Memoized fetch function
+  const fetchItems = useCallback(async (type, parent = null) => {
     try {
-      setLoading(true);
-      setProgress(30);
-      console.log(`Fetching subtopics for topic: ${topic}`);
-      
-      // Get the token from localStorage
-      const token = localStorage.getItem('token');
-      
-      const response = await axios.get(`http://localhost:8000/api/quizzes/subtopics/${encodeURIComponent(topic)}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      console.log('Subtopics response:', response.data);
-      setSubtopics(response.data.subtopics || []);
-      setProgress(100);
-    } catch (err) {
-      console.error(`Failed to load subtopics for ${topic}:`, err);
-      setError(`Failed to load subtopics for ${topic}`);
-      setSubtopics([]);
-    } finally {
-      setLoading(false);
-      setProgress(0);
-    }
-  }, []);
-
-  const fetchConcepts = useCallback(async (subtopic) => {
-    try {
-      setLoading(true);
-      setProgress(30);
-      
-      // Get the token from localStorage
-      const token = localStorage.getItem('token');
-      
-      const response = await axios.get(`http://localhost:8000/api/quizzes/concepts/${encodeURIComponent(subtopic)}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      setConcepts(response.data.concepts || []);
-      setProgress(100);
-    } catch (err) {
-      setError(`Failed to load concepts for ${subtopic}`);
-      setConcepts([]);
-    } finally {
-      setLoading(false);
-      setProgress(0);
-    }
-  }, []);
-
-  const fetchQuestions = useCallback(async (concept) => {
-    try {
+      // Set the appropriate loading state
+    if (type === 'questions') {
       setLoadingQuestions(true);
+    } else {
+      setLoading(true);
+    }
+      setError(null);
+    setQuestionError(null);
       
-      // Get the token from localStorage
       const token = localStorage.getItem('token');
+      let endpoint;
       
-      const response = await axios.get(`http://localhost:8000/api/quizzes/questions/concept/${encodeURIComponent(concept)}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+      switch (type) {
+        case 'subjects':
+          endpoint = '/assessment/subjects';
+          break;
+        case 'topics':
+          endpoint = `/assessment/topics/${encodeURIComponent(parent)}`;
+          break;
+        case 'subtopics':
+          endpoint = `/assessment/subtopics/${encodeURIComponent(parent)}`;
+          break;
+        case 'concepts':
+          endpoint = `/assessment/concepts/${encodeURIComponent(parent)}`;
+          break;
+        case 'questions':
+          endpoint = `/assessment/questions/concept/${encodeURIComponent(parent)}`;
+          setLoadingQuestions(true);
+          break;
+        default:
+          throw new Error(`Invalid item type: ${type}`);
+      }
+      
+      console.log(`Fetching ${type}${parent ? ` for ${parent}` : ''}`);
+
+      const response = await axios.get(`${API_URL}${endpoint}`, {
+        headers: { 'Authorization': `Bearer ${token}` },
       });
-      setConceptQuestions(response.data.questions || []);
+      
+      // Update the appropriate state based on type
+      if (type === 'subjects') {
+        setSubjects(response.data.subjects || []);
+      } else if (type === 'topics') {
+        setTopics(response.data.topics || []);
+      } else if (type === 'subtopics') {
+        setSubtopics(response.data.subtopics || []);
+      } else if (type === 'concepts') {
+        setConcepts(response.data.concepts || []);
+      } else if (type === 'questions') {
+        setConceptQuestions(response.data.questions || []);
+        setLoadingQuestions(false);
+      }
+      
     } catch (err) {
-      setQuestionError(`Failed to load questions for ${concept}`);
-      setConceptQuestions([]);
+      console.error(`Failed to load ${type}${parent ? ` for ${parent}` : ''}:`, err);
+      const errorMsg = `Failed to load ${type}${parent ? ` for ${parent}` : ''}`;
+      
+      if (type === 'questions') {
+        setQuestionError(errorMsg);
+        setConceptQuestions([]);
+        setLoadingQuestions(false);
+      } else {
+        setError(errorMsg);
+        // Reset the appropriate state
+        if (type === 'subjects') setSubjects([]);
+        else if (type === 'topics') setTopics([]);
+        else if (type === 'subtopics') setSubtopics([]);
+        else if (type === 'concepts') setConcepts([]);
+      }
     } finally {
+       if (type === 'questions') {
       setLoadingQuestions(false);
+    } else {
+      setLoading(false);
+    }
     }
   }, []);
+
 
   useEffect(() => {
-    fetchSubjects();
-  }, [fetchSubjects]);
+    fetchItems('subjects');
+  }, [fetchItems]);
 
+  
   // Handler functions
-  const handleSubjectClick = (subject) => {
-    setSelectedSubject(subject);
-    setTopics([]);
-    setSubtopics([]);
-    setConcepts([]);
+  const handleItemClick = (item, level) => {
+    switch (level) {
+      case 'subject':
+        setSelectedSubject(item);
+        setSelectedTopic(null);
+        setSelectedSubtopic(null);
+        setSelectedConcept(null);
+        setTopics([]);
+        setSubtopics([]);
+        setConcepts([]);
+        fetchItems('topics', item);
+        break;
+      case 'topic':
+        setSelectedTopic(item);
+        setSelectedSubtopic(null);
+        setSelectedConcept(null);
+        setSubtopics([]);
+        setConcepts([]);
+        fetchItems('subtopics', item);
+        break;
+      case 'subtopic':
+        setSelectedSubtopic(item);
+        setSelectedConcept(null);
+        setConcepts([]);
+        fetchItems('concepts', item);
+        break;
+      case 'concept':
+        setSelectedConcept(item);
+        setConceptQuestions([]);
+        setQuestionError(null);
+        fetchItems('questions', item);
+        break;
+      default:
+        console.error('Unknown level:', level);
+    }
     setError(null);
-    fetchTopics(subject);
-  };
-
-  const handleTopicClick = (topic) => {
-    setSelectedTopic(topic);
-    setSubtopics([]);
-    setConcepts([]);
-    setError(null);
-    fetchSubtopics(topic);
-  };
-
-  const handleSubtopicClick = (subtopic) => {
-    setSelectedSubtopic(subtopic);
-    setConcepts([]);
-    setError(null);
-    fetchConcepts(subtopic);
-  };
-
-  const handleConceptClick = (concept) => {
-    setSelectedConcept(concept);
-    setConceptQuestions([]);
-    setQuestionError(null);
-    fetchQuestions(concept);
   };
 
   const handleNavigationBack = () => {
+    setLoading(false);
+  setLoadingQuestions(false);
+  setError(null);
+  setQuestionError(null);
     if (selectedConcept) {
       setSelectedConcept(null);
       setConceptQuestions([]);
@@ -359,158 +562,6 @@ const Practice = () => {
     setAssessmentConfigLevel(null);
   };
 
-  // Add missing handler functions
-  const handleRecommendationClick = (item) => {
-    // Handle clicking on a recommendation
-    if (item.type === 'subject') {
-      handleSubjectClick(item.name);
-    } else if (item.type === 'topic') {
-      // First set the parent subject
-      setSelectedSubject(item.parentSubject);
-      handleTopicClick(item.name);
-    } else if (item.type === 'subtopic') {
-      // First set the parent subject and topic
-      setSelectedSubject(item.parentSubject);
-      setSelectedTopic(item.parentTopic);
-      handleSubtopicClick(item.name);
-    } else if (item.type === 'concept') {
-      // Set the entire hierarchy
-      setSelectedSubject(item.parentSubject);
-      setSelectedTopic(item.parentTopic);
-      setSelectedSubtopic(item.parentSubtopic);
-      handleConceptClick(item.name);
-    }
-  };
-
-  const navigateToItem = (item) => {
-    // Navigate to the appropriate level for the item
-    if (item.type === 'subject') {
-      handleSubjectClick(item.name);
-    } else if (item.type === 'topic') {
-      // First set the parent subject
-      setSelectedSubject(item.parentSubject);
-      handleTopicClick(item.name);
-    } else if (item.type === 'subtopic') {
-      // First set the parent subject and topic
-      setSelectedSubject(item.parentSubject);
-      setSelectedTopic(item.parentTopic);
-      handleSubtopicClick(item.name);
-    } else if (item.type === 'concept') {
-      // Set the entire hierarchy
-      setSelectedSubject(item.parentSubject);
-      setSelectedTopic(item.parentTopic);
-      setSelectedSubtopic(item.parentSubtopic);
-      handleConceptClick(item.name);
-    }
-  };
-  
-  // Mock data for recommendations until backend is ready
-  // Remove this entire useEffect block
-  // useEffect(() => {
-  //   // This would normally come from the API
-  //   const mockRecommendations = [
-  //     {
-  //       id: 1,
-  //       name: "Calculus",
-  //       type: "topic",
-  //       parentSubject: "Mathematics",
-  //       reason: "Weak Area",
-  //       image: "https://images.unsplash.com/photo-1635070041078-e363dbe005cb?q=80&w=500&auto=format"
-  //     },
-  //     {
-  //       id: 2,
-  //       name: "Thermodynamics",
-  //       type: "topic",
-  //       parentSubject: "Physics",
-  //       reason: "Next Step",
-  //       image: "https://images.unsplash.com/photo-1636466497217-26a8cbeaf0aa?q=80&w=500&auto=format"
-  //     },
-  //     {
-  //       id: 3,
-  //       name: "Quadratic Equations",
-  //       type: "concept",
-  //       parentSubject: "Mathematics",
-  //       parentTopic: "Algebra",
-  //       parentSubtopic: "Equations",
-  //       reason: "Popular",
-  //       image: "https://images.unsplash.com/photo-1509228627152-72ae9ae6848d?q=80&w=500&auto=format"
-  //     }
-  //   ];
-  //   
-  //   setRecommendedItems(mockRecommendations);
-  //   
-  //   // Mock topic progress
-  //   const mockProgress = {
-  //     "Calculus": 35,
-  //     "Algebra": 75,
-  //     "Geometry": 50,
-  //     "Thermodynamics": 20,
-  //     "Mechanics": 85
-  //   };
-  //   
-  //   setTopicProgress(mockProgress);
-  // }, []);
-
-  // Replace the mock useEffect with this:
-  // useEffect(() => {
-  //   const fetchTopicMastery = async () => {
-  //     try {
-  //       // Get userId from localStorage or your authentication system
-  //       const userId = localStorage.getItem('userId') || '';
-        
-  //       // Try to get mastery data from API
-  //       const response = await axios.get('http://localhost:8000/user/topic-mastery', {
-  //         headers: {
-  //           'Authorization': `Bearer ${localStorage.getItem('token')}`
-  //         },
-  //         params: { userId }
-  //       });
-        
-  //       if (response.data && Object.keys(response.data).length > 0) {
-  //         setTopicProgress(response.data);
-  //         return; // Skip localStorage if API worked
-  //       }
-        
-  //       // API had no data, fall back to localStorage
-  //       const storedMastery = localStorage.getItem('topicMastery');
-  //       if (storedMastery) {
-  //         setTopicProgress(JSON.parse(storedMastery));
-  //       } else {
-  //         // No data anywhere, use mock data
-  //         const mockProgress = {
-  //           "Calculus": 35,
-  //           "Algebra": 75,
-  //           "Geometry": 50,
-  //           "Thermodynamics": 20,
-  //           "Mechanics": 85
-  //         };
-  //         setTopicProgress(mockProgress);
-  //       }
-  //     } catch (error) {
-  //       console.error("Error fetching topic mastery:", error);
-        
-  //       // API failed, try localStorage
-  //       const storedMastery = localStorage.getItem('topicMastery');
-  //       if (storedMastery) {
-  //         setTopicProgress(JSON.parse(storedMastery));
-  //       } else {
-  //         // No data anywhere, use mock data
-  //         const mockProgress = {
-  //           "Calculus": 35,
-  //           "Algebra": 75,
-  //           "Geometry": 50,
-  //           "Thermodynamics": 20,
-  //           "Mechanics": 85
-  //         };
-  //         setTopicProgress(mockProgress);
-  //       }
-  //     }
-  //   };
-    
-  //   fetchTopicMastery();
-  // }, [location.pathname]);
-
-  // Add these functions to handle edit mode
   const startEditing = (currentName) => {
     setEditMode(true);
     setEditingName(currentName);
@@ -544,7 +595,7 @@ const saveRename = async () => {
     // Determine what we're renaming
     if (selectedConcept && editingName === selectedConcept) {
       // Renaming the selected concept
-      endpoint = '/api/quizzes/rename/concept';
+      endpoint = '/assessment/rename/concept';
       params = {
         oldName: editingName,
         newName: newName.trim(),
@@ -552,7 +603,7 @@ const saveRename = async () => {
       };
     } else if (selectedSubtopic && editingName === selectedSubtopic) {
       // Renaming the selected subtopic
-      endpoint = '/api/quizzes/rename/subtopic';
+      endpoint = '/assessment/rename/subtopic';
       params = {
         oldName: editingName,
         newName: newName.trim(),
@@ -560,7 +611,7 @@ const saveRename = async () => {
       };
     } else if (selectedTopic && editingName === selectedTopic) {
       // Renaming the selected topic
-      endpoint = '/api/quizzes/rename/topic';
+      endpoint = '/assessment/rename/topic';
       params = {
         oldName: editingName,
         newName: newName.trim(),
@@ -568,14 +619,14 @@ const saveRename = async () => {
       };
     } else if (selectedSubject && editingName === selectedSubject) {
       // Renaming the selected subject
-      endpoint = '/api/quizzes/rename/subject';
+      endpoint = '/assessment/rename/subject';
       params = {
         oldName: editingName,
         newName: newName.trim()
       };
     } else if (selectedSubtopic && concepts.includes(editingName)) {
       // Renaming a concept in the list
-      endpoint = '/api/quizzes/rename/concept';
+      endpoint = '/assessment/rename/concept';
       params = {
         oldName: editingName,
         newName: newName.trim(),
@@ -583,7 +634,7 @@ const saveRename = async () => {
       };
     } else if (selectedTopic && subtopics.includes(editingName)) {
       // Renaming a subtopic in the list
-      endpoint = '/api/quizzes/rename/subtopic';
+      endpoint = '/assessment/rename/subtopic';
       params = {
         oldName: editingName,
         newName: newName.trim(),
@@ -591,7 +642,7 @@ const saveRename = async () => {
       };
     } else if (selectedSubject && topics.includes(editingName)) {
       // Renaming a topic in the list
-      endpoint = '/api/quizzes/rename/topic';
+      endpoint = '/assessment/rename/topic';
       params = {
         oldName: editingName,
         newName: newName.trim(),
@@ -599,7 +650,7 @@ const saveRename = async () => {
       };
     } else if (subjects.includes(editingName)) {
       // Renaming a subject in the list
-      endpoint = '/api/quizzes/rename/subject';
+      endpoint = '/assessment/rename/subject';
       params = {
         oldName: editingName,
         newName: newName.trim()
@@ -620,7 +671,7 @@ const saveRename = async () => {
     console.log('Making API call to:', endpoint, 'with params:', params);
     
     // Make API call
-    const response = await axios.put(`http://localhost:8000${endpoint}`, params, {
+    const response = await axios.put(`${API_URL}${endpoint}`, params, {
       headers: {
         'Authorization': `Bearer ${token}`
       }
@@ -668,19 +719,16 @@ const saveRename = async () => {
   }
 };
 
-// Add this function to the Practice component
-
-const handleDelete = async (item, level, parentItem) => {
+const handleDelete = async (item, level) => {
   // Confirm deletion
   if (!window.confirm(`Are you sure you want to delete ${level}: ${item}? This will remove all associated questions and cannot be undone.`)) {
     return;
   }
   
   try {
-    let endpoint = `/api/quizzes/delete/${level}/${encodeURIComponent(item)}`;
+    let endpoint = `/assessment/delete/${level}/${encodeURIComponent(item)}`;
     let queryParams = [];
     
-    // Add parent category if available
     if (level === 'topic' && selectedSubject) {
       queryParams.push(`parentCategory=subject&parentValue=${encodeURIComponent(selectedSubject)}`);
     } else if (level === 'subtopic' && selectedTopic) {
@@ -689,15 +737,14 @@ const handleDelete = async (item, level, parentItem) => {
       queryParams.push(`parentCategory=subtopic&parentValue=${encodeURIComponent(selectedSubtopic)}`);
     }
     
-    // Add query parameters to the endpoint
     if (queryParams.length > 0) {
       endpoint += `?${queryParams.join('&')}`;
     }
     
     // Get the token from localStorage
     const token = localStorage.getItem('token');
-    
-    const response = await axios.delete(`http://localhost:8000${endpoint}`, {
+
+    const response = await axios.delete(`${API_URL}${endpoint}`, {
       headers: {
         'Authorization': `Bearer ${token}`
       }
@@ -738,7 +785,6 @@ const handleDelete = async (item, level, parentItem) => {
         }
       }
       
-      // Show success message
       alert(`Successfully deleted ${level}: ${item}`);
     } else {
       alert('Failed to delete item. Please try again.');
@@ -749,110 +795,247 @@ const handleDelete = async (item, level, parentItem) => {
   }
 };
 
+const handleDeleteQuestion = async (questionId) => {
+  // Confirm deletion
+  if (!window.confirm("Are you sure you want to delete this question? This action cannot be undone.")) {
+    return;
+  }
+  
+  try {
+    const token = localStorage.getItem('token');
+    
+    const response = await axios.delete(
+      `${API_URL}/assessment/questions/${questionId}`, 
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
+    );
+    
+    if (response.data.success) {
+      // Remove the question from the state
+      setConceptQuestions(prev => 
+        prev.filter(q => q.questionId !== questionId)
+      );
+      alert('Question deleted successfully!');
+    }
+  } catch (error) {
+    console.error('Error deleting question:', error);
+    alert('Failed to delete question: ' + (error.response?.data?.error || error.message));
+  }
+};
+
+const openEditQuestionModal = (question) => {
+  // Set the current question for editing
+  setCurrentEditQuestion(question);
+  
+  // Populate the form with current values
+  setEditQuestionForm({
+    questionText: question.question,
+    correctAnswer: question.correctAnswer,
+    options: question.options ? [...question.options] : []
+  });
+  
+  // Open the modal
+  setEditQuestionModal(true);
+};
+
+const closeEditQuestionModal = () => {
+  setEditQuestionModal(false);
+  setCurrentEditQuestion(null);
+  setEditQuestionForm({
+    questionText: '',
+    correctAnswer: '',
+    options: []
+  });
+};
+
+const handleUpdateQuestion = async () => {
+  try {
+    const token = localStorage.getItem('token');
+    
+    const response = await axios.put(
+      `${API_URL}/assessment/questions/${currentEditQuestion.questionId}`,
+      {
+        question: editQuestionForm.questionText,
+        correctAnswer: editQuestionForm.correctAnswer,
+        options: editQuestionForm.options
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
+    );
+    
+    if (response.data.success) {
+      // Update the question in the state
+      setConceptQuestions(prev => 
+        prev.map(q => 
+          q.questionId === currentEditQuestion.questionId 
+            ? response.data.question 
+            : q
+        )
+      );
+      
+      // Close the modal and reset form
+      closeEditQuestionModal();
+      
+      alert('Question updated successfully!');
+    }
+  } catch (error) {
+    console.error('Error updating question:', error);
+    alert('Failed to update question: ' + (error.response?.data?.error || error.message));
+  }
+};
+
+const handleOptionChange = (index, value) => {
+  setEditQuestionForm(prev => {
+    const newOptions = [...prev.options];
+    newOptions[index] = value;
+    return { ...prev, options: newOptions };
+  });
+};
+
+const addOption = () => {
+  setEditQuestionForm(prev => ({
+    ...prev,
+    options: [...prev.options, '']
+  }));
+};
+
+const removeOption = (index) => {
+  setEditQuestionForm(prev => {
+    const newOptions = [...prev.options];
+    newOptions.splice(index, 1);
+    return { ...prev, options: newOptions };
+  });
+};
+
   return (
     <ContentWrapper>
+       {/* Joyride component */}
+      <Joyride
+        steps={steps}
+        run={runTour}
+        continuous={true}
+        showProgress={true}
+        showSkipButton={true}
+        callback={handleJoyrideCallback}
+        styles={{
+          options: {
+            primaryColor: '#3b82f6',
+            zIndex: 10000,
+          }
+        }}
+      />
       <Container maxWidth="lg">
-        {/* Progress Bar */}
-        {loading && (
-          <Fade in={loading}>
-            <LinearProgress 
-              variant="determinate" 
-              value={progress} 
-              sx={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 1000 }}
-            />
-          </Fade>
-        )}
 
-        {/* Enhanced Breadcrumbs */}
-        <Breadcrumbs 
-          aria-label="breadcrumb" 
-          sx={{ mb: 3, bgcolor: 'white', p: 2, borderRadius: 2, boxShadow: 1 }}
+        {/* Compact Breadcrumb navigation */}
+        <AnimatedSection
+          elevation={1}
+          sx={{ 
+            mb: 2, 
+            bgcolor: 'white', 
+            p: 1.5, 
+            borderRadius: 1.5,
+            display: 'flex',
+            alignItems: 'center',
+            flexWrap: 'wrap'
+          }}
         >
-
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={() => navigate('/dashboard')} // Navigate to /dashboard
-          sx={{ mr: 2 }}
-        >
-          Go to Dashboard
-        </Button>
-        <Button
-          variant="contained"
-          color="success"
-          startIcon={<UploadFileIcon />}
-          onClick={() => navigate('/files')} 
-          sx={{ mr: 2 }}
-        >
-          Upload & Study
-        </Button>
-          <MuiLink
-            component="button"
-            onClick={() => handleNavigationBack()}
-            color={!selectedSubject ? "text.primary" : "primary.main"}
-            sx={{ fontWeight: !selectedSubject ? 'bold' : 'normal' }}
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={() => navigate('/dashboard')}
+            sx={{ mr: 1.5, mb: { xs: 1, sm: 0 }, px: 2 }}
+            startIcon={<ArrowBackIcon />}
+            size="small"
           >
-            Subjects
-          </MuiLink>
-          {selectedSubject && (
+            Dashboard
+          </Button>
+          <Button
+            variant="contained"
+            color="success"
+            startIcon={<UploadFileIcon />}
+            onClick={() => navigate('/files')} 
+            sx={{ mr: 1.5, mb: { xs: 1, sm: 0 } }}
+            size="small"
+          >
+            Upload
+          </Button>
+          
+          <Breadcrumbs aria-label="breadcrumb" sx={{ 
+            flexGrow: 1, 
+            '& .MuiBreadcrumbs-ol': { 
+              flexWrap: 'wrap' 
+            } 
+          }}>
             <MuiLink
               component="button"
-              onClick={selectedTopic ? () => handleNavigationBack() : undefined}
-              color={!selectedTopic ? "text.primary" : "primary.main"}
-              sx={{ fontWeight: !selectedTopic ? 'bold' : 'normal' }}
+              onClick={() => handleNavigationBack()}
+              color={!selectedSubject ? "text.primary" : "primary.main"}
+              sx={{ fontWeight: !selectedSubject ? 'bold' : 'normal' }}
             >
-              {selectedSubject}
+              Subjects
             </MuiLink>
-          )}
-          {selectedTopic && (
-            <MuiLink
-              component="button"
-              onClick={selectedSubtopic ? () => handleNavigationBack() : undefined}
-              color={!selectedSubtopic ? "text.primary" : "primary.main"}
-              sx={{ fontWeight: !selectedSubtopic ? 'bold' : 'normal' }}
-            >
-              {selectedTopic}
-            </MuiLink>
-          )}
-          {selectedSubtopic && (
-            <Typography 
-              color={selectedConcept ? "primary.main" : "text.primary"}
-              sx={{ fontWeight: !selectedConcept ? 'bold' : 'normal' }}
-            >
-              {selectedSubtopic}
-            </Typography>
-          )}
-          {selectedConcept && (
-            <Typography color="text.primary" sx={{ fontWeight: 'bold' }}>
-              {selectedConcept}
-            </Typography>
-          )}
-        </Breadcrumbs>
+            {selectedSubject && (
+              <MuiLink
+                component="button"
+                onClick={selectedTopic ? () => handleNavigationBack() : undefined}
+                color={!selectedTopic ? "text.primary" : "primary.main"}
+                sx={{ fontWeight: !selectedTopic ? 'bold' : 'normal' }}
+              >
+                {selectedSubject}
+              </MuiLink>
+            )}
+            {selectedTopic && (
+              <MuiLink
+                component="button"
+                onClick={selectedSubtopic ? () => handleNavigationBack() : undefined}
+                color={!selectedSubtopic ? "text.primary" : "primary.main"}
+                sx={{ fontWeight: !selectedSubtopic ? 'bold' : 'normal' }}
+              >
+                {selectedTopic}
+              </MuiLink>
+            )}
+            {selectedSubtopic && (
+              <Typography 
+                color={selectedConcept ? "primary.main" : "text.primary"}
+                sx={{ fontWeight: !selectedConcept ? 'bold' : 'normal' }}
+              >
+                {selectedSubtopic}
+              </Typography>
+            )}
+            {selectedConcept && (
+              <Typography color="text.primary" sx={{ fontWeight: 'bold' }}>
+                {selectedConcept}
+              </Typography>
+            )}
+          </Breadcrumbs>
+        </AnimatedSection>
 
-        {/* Back to Dashboard button - only show at subjects level */}
-        {/* {!selectedSubject && (
-          <Box sx={{ mb: 3 }}>
-            <Button
-              startIcon={<ArrowBackIcon />}
-              onClick={() => navigate('/dashboard')}
-              variant="outlined"
-              color="primary"
-            >
-              Back to Dashboard
-            </Button>
-          </Box>
-        )} */}
-
-        {/* Header Section */}
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 4 }}>
+        {/* Compact Header Section */}
+        <AnimatedSection
+          elevation={1}
+          sx={{
+            p: 1.5,
+            mb: 2,
+            display: 'flex',
+            alignItems: 'center',
+            borderRadius: 1.5,
+            backgroundColor: 'white'
+          }}
+        >
           {(selectedSubject || selectedTopic || selectedSubtopic || selectedConcept) && (
             <Tooltip title="Go Back">
               <Button
                 startIcon={<ArrowBackIcon />}
                 onClick={handleNavigationBack}
-                variant="contained"
-                color="primary"
-                sx={{ mr: 2, borderRadius: 20 }}
+                variant="outlined"
+                size="small"
+                sx={{ mr: 1.5, borderRadius: 20, minWidth: 0, px: 1 }}
               >
                 Back
               </Button>
@@ -874,20 +1057,20 @@ const handleDelete = async (item, level, parentItem) => {
                 color="primary" 
                 onClick={saveRename}
                 disabled={!newName || newName.trim() === ''}
+                size="small"
               >
                 <SaveIcon />
               </IconButton>
-              <IconButton color="default" onClick={cancelEditing}>
+              <IconButton color="default" onClick={cancelEditing} size="small">
                 <CancelIcon />
               </IconButton>
             </Box>
           ) : (
             <Box sx={{ display: 'flex', alignItems: 'center', flexGrow: 1 }}>
               <Typography
-                variant="h3"
+                variant="h6"
                 sx={{
-                  flexGrow: 1,
-                  fontWeight: 700,
+                  fontWeight: 600,
                   color: 'primary.main',
                   letterSpacing: '-0.5px',
                 }}
@@ -903,660 +1086,345 @@ const handleDelete = async (item, level, parentItem) => {
                   : 'Explore Subjects'}
               </Typography>
               
-              {/* Remove this Edit button since we now have inline editing */}
-              {/* {(selectedSubject || selectedTopic || selectedSubtopic || selectedConcept) && (
-                <Tooltip title="Rename">
-                  <IconButton 
-                    color="primary"
-                    onClick={() => startEditing(
-                      selectedConcept || selectedSubtopic || selectedTopic || selectedSubject
-                    )}
-                  >
-                    <EditIcon />
-                  </IconButton>
-                </Tooltip>
-              )} */}
+              {loading && (
+                <CircularProgress size={20} sx={{ ml: 2 }} />
+              )}
             </Box>
           )}
-        </Box>
+        </AnimatedSection>
 
-        {/* Questions Section */}
+        {/* Questions Section - Improved */}
         {selectedConcept && (
           <Fade in={!!selectedConcept}>
-            <Paper 
-              elevation={4}
+            <AnimatedSection 
+              elevation={2}
               sx={{ 
-                p: 3, 
-                mb: 4, 
-                borderRadius: 2,
+                p: 2, 
+                mb: 3, 
+                borderRadius: 1.5,
                 bgcolor: 'white',
-                borderLeft: '5px solid',
+                borderLeft: '4px solid',
                 borderColor: 'primary.main'
               }}
             >
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5, alignItems: 'center' }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Typography variant="h5" color="primary.main">
+                  <QuizIcon color="primary" />
+                  <Typography variant="h6" color="primary.main" fontWeight="500">
                     Practice Questions
                   </Typography>
                   <Chip 
-                    label={`${conceptQuestions.length} Qs`}
+                    label={`${conceptQuestions.length} Questions`}
                     size="small"
                     color="primary"
                     variant="outlined"
                   />
                 </Box>
-                <IconButton onClick={() => setSelectedConcept(null)}>
+                <IconButton onClick={() => setSelectedConcept(null)} size="small">
                   <CloseIcon />
                 </IconButton>
               </Box>
 
               {loadingQuestions ? (
-                <Box sx={{ textAlign: 'center', py: 4 }}>
-                  <CircularProgress />
+                <Box sx={{ textAlign: 'center', py: 3 }}>
+                  <CircularProgress size={24} />
                 </Box>
               ) : questionError ? (
-                <Typography color="error" sx={{ my: 2 }}>{questionError}</Typography>
+                <Typography color="error" sx={{ my: 1.5 }}>{questionError}</Typography>
               ) : conceptQuestions.length === 0 ? (
-                <Typography sx={{ my: 2, color: 'text.secondary' }}>
+                <Typography sx={{ my: 1.5, color: 'text.secondary' }}>
                   No questions available yet. Check back later!
                 </Typography>
               ) : (
-                conceptQuestions.map((question, index) => (
-                  <StyledAccordion key={index}>
-                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                      <Typography sx={{ fontWeight: 500 }}>
-                        Q{index + 1}: {question.question}
-                      </Typography>
-                    </AccordionSummary>
-                    <AccordionDetails>
-                      <Box>
-                        {question.options && (
-                          <Box sx={{ mb: 2 }}>
-                            {question.options.map((option, idx) => (
-                              <Chip
-                                key={idx}
-                                label={`${String.fromCharCode(97 + idx)}. ${option}`}
-                                variant={option === question.correctAnswer ? "filled" : "outlined"}
-                                color={option === question.correctAnswer ? "success" : "default"}
-                                sx={{ m: 0.5 }}
-                              />
-                            ))}
+                <Box sx={{ mt: 1 }}>
+                  {conceptQuestions.map((question, index) => (
+                    <StyledAccordion key={index} sx={{ mb: 1 }}>
+                      <AccordionSummary 
+                        expandIcon={<ExpandMoreIcon />}
+                        sx={{
+                          minHeight: '48px',
+                          '& .MuiAccordionSummary-content': {
+                            margin: '8px 0'
+                          }
+                        }}
+                      >
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center', pr: 1 }}>
+                          <Typography sx={{ fontWeight: 500, flex: 1, fontSize: '0.95rem' }}>
+                            Q{index + 1}: {question.question}
+                          </Typography>
+                          <Box sx={{ display: 'flex', ml: 1 }} onClick={(e) => e.stopPropagation()}>
+                            <IconButton 
+                              size="small" 
+                              color="primary" 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openEditQuestionModal(question);
+                              }}
+                              sx={{ mr: 0.5 }}
+                            >
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                            <IconButton 
+                              size="small" 
+                              color="error" 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteQuestion(question.questionId);
+                              }}
+                            >
+                              <DeleteOutlineIcon fontSize="small" />
+                            </IconButton>
                           </Box>
-                        )}
-                        <Paper 
-                          sx={{ 
-                            p: 2, 
-                            bgcolor: 'success.light', 
-                            borderRadius: 1,
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 1
-                          }}
-                        >
-                          <InfoIcon color="success" />
-                          <Typography>{question.correctAnswer}</Typography>
-                        </Paper>
-                      </Box>
-                    </AccordionDetails>
-                  </StyledAccordion>
-                ))
+                        </Box>
+                      </AccordionSummary>
+                      <AccordionDetails sx={{ pt: 0, pb: 1.5 }}>
+                        <Box>
+                          {question.options && (
+                            <Box sx={{ mb: 1.5, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                              {question.options.map((option, idx) => (
+                                <Chip
+                                  key={idx}
+                                  label={`${String.fromCharCode(97 + idx)}. ${option}`}
+                                  variant={option === question.correctAnswer ? "filled" : "outlined"}
+                                  color={option === question.correctAnswer ? "success" : "default"}
+                                  size="small"
+                                />
+                              ))}
+                            </Box>
+                          )}
+                          <Paper 
+                            sx={{ 
+                              p: 1.5, 
+                              bgcolor: 'success.light', 
+                              borderRadius: 1,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 1
+                            }}
+                            elevation={0}
+                          >
+                            <InfoIcon color="success" fontSize="small" />
+                            <Typography variant="body2">{question.correctAnswer}</Typography>
+                          </Paper>
+                        </Box>
+                      </AccordionDetails>
+                    </StyledAccordion>
+                  ))}
+                </Box>
               )}
-            </Paper>
+            </AnimatedSection>
           </Fade>
         )}
 
-        {/* Main Content Grid */}
-        <Grid2 container spacing={3}>
-          {error && !selectedConcept && (
-            <Grid2 item xs={12}>
-              <Paper sx={{ p: 2, bgcolor: 'error.light', borderRadius: 2 }}>
-                <Typography color="error">{error}</Typography>
-              </Paper>
-            </Grid2>
-          )}
-
-          {/* Update the Card content section in the subjects mapping */}
-          {!selectedSubject && subjects.map((subject) => (
-            <Grid2 item xs={12} sm={6} md={4} lg={3} key={subject}>
-              <StyledCard>
-                <CardActionArea onClick={() => handleSubjectClick(subject)}>
-                  <CardMedia
-                    component="img"
-                    height="160"
-                    image={subjectImages[subject] || defaultSubjectImage}
-                    alt={subject}
-                    sx={{ transition: 'transform 0.3s' }}
-                  />
-                  <CardContent>
-                    {editMode && editingName === subject ? (
-                      <Box 
-                        sx={{ display: 'flex', alignItems: 'center' }}
-                        onClick={(e) => e.stopPropagation()} // Prevent card click
-                      >
-                        <TextField
-                          value={newName}
-                          onChange={(e) => setNewName(e.target.value)}
-                          variant="outlined"
-                          size="small"
-                          sx={{ flexGrow: 1 }}
-                          autoFocus
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') saveRename();
-                            if (e.key === 'Escape') cancelEditing();
-                          }}
-                        />
-                        <IconButton size="small" color="primary" onClick={saveRename}>
-                          <SaveIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton size="small" onClick={cancelEditing}>
-                          <CancelIcon fontSize="small" />
-                        </IconButton>
-                      </Box>
-                    ) : (
-                      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                        <Typography 
-                          variant="h6" 
-                          sx={{ 
-                            fontWeight: 600,
-                            textAlign: 'center',
-                            color: 'text.primary',
-                            cursor: 'pointer',
-                            '&:hover': {
-                              textDecoration: 'underline',
-                              color: 'primary.main'
-                            }
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            startEditing(subject);
-                          }}
-                        >
-                          {subject}
-                        </Typography>
-                      </Box>
-                    )}
-                  </CardContent>
-                </CardActionArea>
-                <CardActions sx={{ justifyContent: 'space-between', p: 2, borderTop: '1px solid #eee' }}>
-                  <Button 
-                    size="small"
-                    startIcon={<ListIcon />}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleSubjectClick(subject);
-                    }}
-                  >
-                    Explore
-                  </Button>
-                  <Box>
-                    <Button 
-                      size="small"
-                      color="secondary"
-                      startIcon={<QuizIcon />}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openAssessmentConfig(subject, 'subject');
-                      }}
-                    >
-                      Practice
-                    </Button>
-                     <Button 
-                      size="small"
-                      color="error"
-                      startIcon={<DeleteIcon />}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDelete(subject, 'subject');
-                      }}
-                      sx={{ ml: 1 }}
-                    >
-                      Delete
-                    </Button>
-                  </Box>
-                </CardActions>
-              </StyledCard>
-            </Grid2>
-          ))}
-
-          {selectedSubject && !selectedTopic && topics.map((topic) => (
-            <Grid2 item xs={12} sm={6} md={4} lg={3} key={topic}>
-              <StyledCard>
-                {/* <Box sx={{ position: 'absolute', top: 10, right: 10, zIndex: 2 }}>
-                  <Tooltip title={`Mastery: ${topicProgress[topic] || 0}%`}>
-                    <CircularProgress 
-                      variant="determinate" 
-                      value={topicProgress[topic] || 0} 
-                      size={40}
-                      thickness={5}
-                      sx={{
-                        background: 'rgba(255,255,255,0.8)',
-                        borderRadius: '50%',
-                        padding: '2px',
-                        boxShadow: 1,
-                        color: topicProgress[topic] > 80 ? 'success.main' : 
-                              topicProgress[topic] > 50 ? 'warning.main' : 'error.main',
-                      }}
-                    />
-                  </Tooltip>
-                </Box> */}
-                <CardActionArea onClick={() => handleTopicClick(topic)}>
-                  <CardMedia
-                    component="img"
-                    height="160"
-                    image={topicImages[topic] || defaultTopicImage}
-                    alt={topic}
-                    sx={{ transition: 'transform 0.3s' }}
-                  />
-                  <CardContent>
-                    {editMode && editingName === topic ? (
-                      <Box 
-                        sx={{ display: 'flex', alignItems: 'center' }}
-                        onClick={(e) => e.stopPropagation()} // Prevent card click
-                      >
-                        <TextField
-                          value={newName}
-                          onChange={(e) => setNewName(e.target.value)}
-                          variant="outlined"
-                          size="small"
-                          sx={{ flexGrow: 1 }}
-                          autoFocus
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') saveRename();
-                            if (e.key === 'Escape') cancelEditing();
-                          }}
-                        />
-                        <IconButton size="small" color="primary" onClick={saveRename}>
-                          <SaveIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton size="small" onClick={cancelEditing}>
-                          <CancelIcon fontSize="small" />
-                        </IconButton>
-                      </Box>
-                    ) : (
-                      <Typography 
-                        variant="h6" 
-                        sx={{ 
-                          fontWeight: 600, 
-                          textAlign: 'center',
-                          cursor: 'pointer',
-                          '&:hover': {
-                            textDecoration: 'underline',
-                            color: 'primary.main'
-                          }
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          startEditing(topic);
-                        }}
-                      >
-                        {topic}
-                      </Typography>
-                    )}
-                  </CardContent>
-                </CardActionArea>
-                <CardActions sx={{ justifyContent: 'space-between', p: 2 }}>
-                  <Button 
-                    size="small" 
-                    startIcon={<ListIcon />} 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleTopicClick(topic);
-                    }}
-                  >
-                    Explore
-                  </Button>
-                  <Box>
-                    <Button 
-                      size="small" 
-                      color="secondary"
-                      startIcon={<QuizIcon />}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openAssessmentConfig(topic, 'topic');
-                      }}
-                    >
-                      Practice
-                    </Button>
-                    <Button 
-                      size="small"
-                      color="error"
-                      startIcon={<DeleteIcon />}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDelete(topic, 'topic');
-                      }}
-                      sx={{ ml: 1 }}
-                    >
-                      Delete
-                    </Button>
-                  </Box>
-                </CardActions>
-              </StyledCard>
-            </Grid2>
-          ))}
-
-          {selectedTopic && !selectedSubtopic && subtopics.map((subtopic) => (
-            <Grid2 item xs={12} sm={6} md={4} lg={3} key={subtopic}>
-              <StyledCard>
-                <CardActionArea onClick={() => handleSubtopicClick(subtopic)}>
-                  <CardMedia
-                    component="img"
-                    height="160"
-                    image={subtopicImages[subtopic] || defaultSubtopicImage}
-                    alt={subtopic}
-                    sx={{ transition: 'transform 0.3s' }}
-                  />
-                  <CardContent>
-                    {editMode && editingName === subtopic ? (
-                      <Box 
-                        sx={{ display: 'flex', alignItems: 'center' }}
-                        onClick={(e) => e.stopPropagation()} // Prevent card click
-                      >
-                        <TextField
-                          value={newName}
-                          onChange={(e) => setNewName(e.target.value)}
-                          variant="outlined"
-                          size="small"
-                          sx={{ flexGrow: 1 }}
-                          autoFocus
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') saveRename();
-                            if (e.key === 'Escape') cancelEditing();
-                          }}
-                        />
-                        <IconButton size="small" color="primary" onClick={saveRename}>
-                          <SaveIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton size="small" onClick={cancelEditing}>
-                          <CancelIcon fontSize="small" />
-                        </IconButton>
-                      </Box>
-                    ) : (
-                      <Typography 
-                        variant="h6" 
-                        sx={{ 
-                          fontWeight: 600, 
-                          textAlign: 'center',
-                          cursor: 'pointer',
-                          '&:hover': {
-                            textDecoration: 'underline',
-                            color: 'primary.main'
-                          }
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          startEditing(subtopic);
-                        }}
-                      >
-                        {subtopic}
-                      </Typography>
-                    )}
-                  </CardContent>
-                </CardActionArea>
-                <CardActions sx={{ justifyContent: 'space-between', p: 2, borderTop: '1px solid #eee' }}>
-                  <Button 
-                    size="small" 
-                    startIcon={<ListIcon />} 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleSubtopicClick(subtopic);
-                    }}
-                  >
-                    Explore
-                  </Button>
-                  <Box>
-                    <Button 
-                      size="small" 
-                      color="secondary"
-                      startIcon={<QuizIcon />}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openAssessmentConfig(subtopic, 'subtopic');
-                      }}
-                    >
-                      Practice
-                    </Button>
-                    <Button 
-                      size="small"
-                      color="error"
-                      startIcon={<DeleteIcon />}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDelete(subtopic, 'subtopic');
-                      }}
-                      sx={{ ml: 1 }}
-                    >
-                      Delete
-                    </Button>
-                  </Box>
-                </CardActions>
-              </StyledCard>
-            </Grid2>
-          ))}
-
-          {selectedSubtopic && !selectedConcept && concepts.map((concept) => (
-            <Grid2 item xs={12} sm={6} md={4} lg={3} key={concept}>
-              <StyledCard>
-                <CardActionArea onClick={() => handleConceptClick(concept)}>
-                  <CardMedia
-                    component="img"
-                    height="160"
-                    image={conceptImages[concept] || defaultConceptImage}
-                    alt={concept}
-                    sx={{ transition: 'transform 0.3s' }}
-                  />
-                  <CardContent>
-                    {editMode && editingName === concept ? (
-                      <Box 
-                        sx={{ display: 'flex', alignItems: 'center' }}
-                        onClick={(e) => e.stopPropagation()} // Prevent card click
-                      >
-                        <TextField
-                          value={newName}
-                          onChange={(e) => setNewName(e.target.value)}
-                          variant="outlined"
-                          size="small"
-                          sx={{ flexGrow: 1 }}
-                          autoFocus
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') saveRename();
-                            if (e.key === 'Escape') cancelEditing();
-                          }}
-                        />
-                        <IconButton size="small" color="primary" onClick={saveRename}>
-                          <SaveIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton size="small" onClick={cancelEditing}>
-                          <CancelIcon fontSize="small" />
-                        </IconButton>
-                      </Box>
-                    ) : (
-                      <Typography 
-                        variant="h6" 
-                        sx={{ 
-                          fontWeight: 600, 
-                          textAlign: 'center',
-                          cursor: 'pointer',
-                          '&:hover': {
-                            textDecoration: 'underline',
-                            color: 'primary.main'
-                          }
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          startEditing(concept);
-                        }}
-                      >
-                        {concept}
-                      </Typography>
-                    )}
-                  </CardContent>
-                </CardActionArea>
-                <CardActions sx={{ justifyContent: 'space-between', p: 2, borderTop: '1px solid #eee' }}>
-                  <Button 
-                    size="small" 
-                    color="secondary"
-                    startIcon={<QuizIcon />}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openAssessmentConfig(concept, 'concept');
-                    }}
-                  >
-                    Practice
-                  </Button>
-                  <Button 
-                    size="small"
-                    color="error"
-                    startIcon={<DeleteIcon />}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDelete(concept, 'concept');
-                    }}
-                  >
-                    Delete
-                  </Button>
-                </CardActions>
-              </StyledCard>
-            </Grid2>
-          ))}
-        </Grid2>
-
-        {/* Empty State Messages */}
-        {selectedSubject && topics.length === 0 && !loading && !error && (
-          <Box sx={{ textAlign: 'center', mt: 4 }}>
-            <Typography variant="h6" color="text.secondary">
-              No topics available for {selectedSubject}
-            </Typography>
-          </Box>
+        {/* Error Message - More compact */}
+        {error && !selectedConcept && (
+          <Paper sx={{ p: 1.5, bgcolor: 'error.light', borderRadius: 1.5, mb: 2 }}>
+            <Typography color="error" variant="body2">{error}</Typography>
+          </Paper>
         )}
-        {selectedTopic && subtopics.length === 0 && !loading && !error && (
-          <Box sx={{ textAlign: 'center', mt: 4 }}>
-            <Typography variant="h6" color="text.secondary">
-              No subtopics available for {selectedTopic}
-            </Typography>
-          </Box>
-        )}
-        {selectedSubtopic && concepts.length === 0 && !loading && !error && (
-          <Box sx={{ textAlign: 'center', mt: 4 }}>
-            <Typography variant="h6" color="text.secondary">
-              No concepts available for {selectedSubtopic}
-            </Typography>
-          </Box>
-        )}
+
+        {/* Main List Component - Only show when not viewing questions */}
+{!selectedConcept && (
+  <AnimatedSection elevation={1} sx={{ borderRadius: 1.5, mb: 3, overflow: 'hidden', backgroundColor: 'white' }}>
+    <Box sx={{ p: 1.5, borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+        {!selectedSubject && <SchoolIcon sx={{ mr: 1, color: 'primary.main' }} />}
+        {selectedSubject && !selectedTopic && <ListIcon sx={{ mr: 1, color: 'secondary.main' }} />}
+        {selectedTopic && !selectedSubtopic && <InfoIcon sx={{ mr: 1, color: 'success.main' }} />}
+        {selectedSubtopic && !selectedConcept && <QuizIcon sx={{ mr: 1, color: 'info.main' }} />}
         
-        {/* Recommended Items Section - only show if actual recommendations exist */}
-        {selectedSubject && !loading && recommendedItems.length > 0 && (
-          <Box sx={{ mt: 6 }}>
-            <Typography variant="h5" sx={{ mb: 3, fontWeight: 700 }}>Recommended for You</Typography>
-            <Grid2 container spacing={3}>
-              {recommendedItems.map((item) => (
-                <Grid2 item xs={12} sm={6} md={4} lg={3} key={item.id}>
-                  <StyledCard>
-                    <CardActionArea onClick={() => handleRecommendationClick(item)}>
-                      <CardMedia
-                        component="img"
-                        height="160"
-                        image={item.image || defaultImage}
-                        alt={item.name}
-                        sx={{ transition: 'transform 0.3s' }}
-                      />
-                      <Box
-                        sx={{
-                          position: 'absolute',
-                          top: 0,
-                          left: 0,
-                          width: '100%',
-                          bgcolor: 'rgba(0,0,0,0.6)',
-                          color: 'white',
-                          p: 1,
-                          fontSize: '0.8rem',
-                        }}
-                      >
-                        <Chip
-                          label={item.reason}
-                          size="small"
-                          color={
-                            item.reason === 'Weak Area' ? 'error' :
-                            item.reason === 'Next Step' ? 'primary' :
-                            'default'
-                          }
-                          sx={{ fontSize: '0.7rem' }}
-                        />
-                      </Box>
-                      <CardContent>
-                        <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                          {item.name}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          {item.type.charAt(0).toUpperCase() + item.type.slice(1)}
-                        </Typography>
-                      </CardContent>
-                    </CardActionArea>
-                    <CardActions sx={{ justifyContent: 'space-between' }}>
-                      <Button size="small" onClick={() => navigateToItem(item)}>
-                        Explore
-                      </Button>
-                      <Button 
-                        size="small" 
-                        color="secondary"
-                        startIcon={<QuizIcon />}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openAssessmentConfig(item.name, item.type);
-                        }}
-                      >
-                        Practice
-                      </Button>
-                    </CardActions>
-                  </StyledCard>
-                </Grid2>
+        <Typography variant="body1" fontWeight="500">
+          {!selectedSubject && 'All Subjects'}
+          {selectedSubject && !selectedTopic && `Topics in ${selectedSubject}`}
+          {selectedTopic && !selectedSubtopic && `Subtopics in ${selectedTopic}`}
+          {selectedSubtopic && !selectedConcept && `Concepts in ${selectedSubtopic}`}
+        </Typography>
+      </Box>
+      
+      {/* Counter chip */}
+      <Chip 
+        label={!selectedSubject ? `${subjects.length} subjects` : 
+              selectedSubject && !selectedTopic ? `${topics.length} topics` :
+              selectedTopic && !selectedSubtopic ? `${subtopics.length} subtopics` :
+              `${concepts.length} concepts`}
+        size="small"
+        color={!selectedSubject ? 'primary' :
+              selectedSubject && !selectedTopic ? 'secondary' :
+              selectedTopic && !selectedSubtopic ? 'success' : 'info'}
+        variant="outlined"
+      />
+    </Box>  
+          {loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 3 }}>
+              <CircularProgress size={24} />
+            </Box>
+          ) : (
+            <List sx={{ p: 1 }}>
+              {/* Subjects List */}
+              {!selectedSubject && subjects.map((subject, index) => (
+                <React.Fragment key={subject}>
+                  <CategoryListItem
+                    item={subject}
+                    itemType="subject"
+                    onItemClick={() => handleItemClick(subject, 'subject')}
+                    onExplore={() => handleItemClick(subject, 'subject')}
+                    onPractice={() => openAssessmentConfig(subject, 'subject')}
+                    onDelete={handleDelete}
+                    editMode={editMode}
+                    editingName={editingName}
+                    newName={newName}
+                    setNewName={setNewName}
+                    startEditing={startEditing}
+                    saveRename={saveRename}
+                    cancelEditing={cancelEditing}
+                    className="subject-card"
+                  />
+                </React.Fragment>
               ))}
-            </Grid2>
-          </Box>
-        )}
 
-        {/* Welcome message for brand new users with no subjects */}
-        {!selectedSubject && subjects.length === 0 && !loading && !error && (
-          <Box sx={{ mb: 5 }}>
-            <Paper
-              elevation={3}
-              sx={{
-                p: 4,
-                borderRadius: 4,
-                background: 'linear-gradient(145deg, #e3f2fd 0%, #bbdefb 100%)',
-              }}
-            >
-              <Typography variant="h4" gutterBottom color="primary.dark">
-                Welcome to Your Self-Assessment Hub!
-              </Typography>
-              <Typography variant="body1" paragraph>
-                This is where all your automatically generated quizzes will appear as you study documents. 
-                To get started, upload study materials and generate questions while reading.
-              </Typography>
+              {/* Topics List */}
+              {selectedSubject && !selectedTopic && topics.map((topic, index) => (
+                <React.Fragment key={topic}>
+                  <CategoryListItem
+                    item={topic}
+                    itemType="topic"
+                    onItemClick={() => handleItemClick(topic, 'topic')}
+                    onExplore={() => handleItemClick(topic, 'topic')}
+                    onPractice={() => openAssessmentConfig(topic, 'topic')}
+                    onDelete={handleDelete}
+                    editMode={editMode}
+                    editingName={editingName}
+                    newName={newName}
+                    setNewName={setNewName}
+                    startEditing={startEditing}
+                    saveRename={saveRename}
+                    cancelEditing={cancelEditing}
+                  />
+                </React.Fragment>
+              ))}
+
+              {/* Subtopics List */}
+              {selectedTopic && !selectedSubtopic && subtopics.map((subtopic, index) => (
+                <React.Fragment key={subtopic}>
+                  <CategoryListItem
+                    item={subtopic}
+                    itemType="subtopic"
+                    onItemClick={() => handleItemClick(subtopic, 'subtopic')}
+                    onExplore={() => handleItemClick(subtopic, 'subtopic')}
+                    onPractice={() => openAssessmentConfig(subtopic, 'subtopic')}
+                    onDelete={handleDelete}
+                    editMode={editMode}
+                    editingName={editingName}
+                    newName={newName}
+                    setNewName={setNewName}
+                    startEditing={startEditing}
+                    saveRename={saveRename}
+                    cancelEditing={cancelEditing}
+                  />
+                </React.Fragment>
+              ))}
+
+              {/* Concepts List */}
+              {selectedSubtopic && !selectedConcept && concepts.map((concept, index) => (
+                <React.Fragment key={concept}>
+                  <CategoryListItem
+                    item={concept}
+                    itemType="concept"
+                    onItemClick={() => handleItemClick(concept, 'concept')}
+                    onExplore={() => handleItemClick(concept, 'concept')}
+                    onPractice={() => openAssessmentConfig(concept, 'concept')}
+                    onDelete={handleDelete}
+                    editMode={editMode}
+                    editingName={editingName}
+                    newName={newName}
+                    setNewName={setNewName}
+                    startEditing={startEditing}
+                    saveRename={saveRename}
+                    cancelEditing={cancelEditing}
+                    showExplore={false}
+                  />
+                </React.Fragment>
+              ))}
+            </List>
+          )}
+          
+          {/* Empty states for each level */}
+          {!loading && !error && (
+            <>
+              {selectedSubject && topics.length === 0 && (
+                <Box sx={{ p: 3, textAlign: 'center' }}>
+                  <Typography variant="body2" color="text.secondary">
+                    No topics available for {selectedSubject}
+                  </Typography>
+                </Box>
+              )}
               
-              <Box sx={{ display: 'flex', gap: 3, mt: 3, flexWrap: 'wrap' }}>
-                <Button 
-                  variant="contained"
-                  size="large"
-                  startIcon={<UploadFileIcon />}
-                  onClick={() => navigate('/files')}
-                  sx={{ borderRadius: '12px', py: 1.5 }}
-                >
-                  Upload Study Documents
-                </Button>
-                <Button
-                  variant="outlined"
-                  size="large"
-                  startIcon={<PlayArrowIcon />}
-                  onClick={() => navigate('/timetable')}
-                  sx={{ borderRadius: '12px', py: 1.5 }}
-                >
-                  View Study Schedule
-                </Button>
-              </Box>
-            </Paper>
-          </Box>
+              {selectedTopic && subtopics.length === 0 && (
+                <Box sx={{ p: 3, textAlign: 'center' }}>
+                  <Typography variant="body2" color="text.secondary">
+                    No subtopics available for {selectedTopic}
+                  </Typography>
+                </Box>
+              )}
+              
+              {selectedSubtopic && concepts.length === 0 && (
+                <Box sx={{ p: 3, textAlign: 'center' }}>
+                  <Typography variant="body2" color="text.secondary">
+                    No concepts available for {selectedSubtopic}
+                  </Typography>
+                </Box>
+              )}
+              
+              {!selectedSubject && subjects.length === 0 && (
+                <Box sx={{ p: 3, textAlign: 'center' }}>
+                  <Typography variant="body2" color="text.secondary">
+                    No subjects available yet
+                  </Typography>
+                </Box>
+              )}
+            </>
+          )}
+        </AnimatedSection>)}
+
+        {/* Welcome message for brand new users - more compact */}
+        {!selectedSubject && subjects.length === 0 && !loading && !error && (
+          <AnimatedSection
+            elevation={2}
+            sx={{
+              p: 3,
+              borderRadius: 1.5,
+              background: 'linear-gradient(145deg, #e3f2fd 0%, #bbdefb 100%)',
+            }}
+          >
+            <Typography variant="h6" gutterBottom color="primary.dark" sx={{ fontWeight: 600 }}>
+              Welcome to Your Self-Assessment Hub!
+            </Typography>
+            <Typography variant="body2" paragraph>
+              This is where all your automatically generated quizzes will appear as you study documents. 
+              To get started, upload study materials and generate questions while reading.
+            </Typography>
+            
+            <Box sx={{ display: 'flex', gap: 1.5, mt: 2, flexWrap: 'wrap' }}>
+              <Button 
+                variant="contained"
+                size="small"
+                startIcon={<UploadFileIcon />}
+                onClick={() => navigate('/files')}
+                sx={{ borderRadius: '8px' }}
+              >
+                Upload Study Documents
+              </Button>
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<PlayArrowIcon />}
+                onClick={() => navigate('/timetable')}
+                sx={{ borderRadius: '8px' }}
+              >
+                View Study Schedule
+              </Button>
+            </Box>
+          </AnimatedSection>
         )}
       </Container>
 
@@ -1568,26 +1436,79 @@ const handleDelete = async (item, level, parentItem) => {
         level={assessmentConfigLevel} 
         navigate={navigate}
       />
+
+      {/* Edit Question Modal */}
+      <Dialog open={editQuestionModal} onClose={closeEditQuestionModal} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          <Box display="flex" alignItems="center">
+            <EditIcon sx={{ mr: 1 }} fontSize="small" />
+            Edit Question
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <TextField
+            label="Question Text"
+            fullWidth
+            margin="normal"
+            value={editQuestionForm.questionText}
+            onChange={(e) => setEditQuestionForm({...editQuestionForm, questionText: e.target.value})}
+          />
+          <TextField
+            label="Correct Answer"
+            fullWidth
+            margin="normal"
+            value={editQuestionForm.correctAnswer}
+            onChange={(e) => setEditQuestionForm({...editQuestionForm, correctAnswer: e.target.value})}
+          />
+          {editQuestionForm.options.map((option, index) => (
+            <Box key={index} sx={{ display: 'flex', alignItems: 'center', mt: 1.5 }}>
+              <TextField
+                label={`Option ${index + 1}`}
+                fullWidth
+                value={option}
+                onChange={(e) => handleOptionChange(index, e.target.value)}
+                size="small"
+              />
+              <IconButton color="error" onClick={() => removeOption(index)} size="small" sx={{ ml: 0.5 }}>
+                <DeleteOutlineIcon fontSize="small" />
+              </IconButton>
+            </Box>
+          ))}
+          <Button 
+            onClick={addOption} 
+            startIcon={<AddIcon />}
+            size="small" 
+            sx={{ mt: 1.5 }}
+          >
+            Add Option
+          </Button>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeEditQuestionModal} size="small">Cancel</Button>
+          <Button onClick={handleUpdateQuestion} variant="contained" color="primary" size="small">Save</Button>
+        </DialogActions>
+      </Dialog>
     </ContentWrapper>
   );
 };
 
-// Assessment Configuration Modal
+// Assessment Configuration Modal - Kept the same with small adjustments for consistency
 const AssessmentConfigModal = ({ open, handleClose, item, level, navigate }) => {
+  // Keep the existing state and handlers
   const [config, setConfig] = useState({
     numQuestions: 5,
     difficulty: 'Medium',
     timeLimit: 0, // 0 = no limit
     questionTypes: ['open-ended'],
     includeSubtopics: true,
-    selectedItems: [] // Store selected topics/subtopics/concepts
+    selectedItems: [], // Store selected topics/subtopics/concepts
+    considerHistory: true // Add this new parameter
   });
   
-  // State to hold all available items at the current level
   const [availableItems, setAvailableItems] = useState([]);
   const [loadingItems, setLoadingItems] = useState(false);
   
-  // Fetch available items based on level when modal opens
+    // Fetch available items based on level when modal opens
   useEffect(() => {
     if (open && level && !config.includeSubtopics) {
       fetchAvailableItems();
@@ -1604,15 +1525,15 @@ const AssessmentConfigModal = ({ open, handleClose, item, level, navigate }) => 
     try {
       let endpoint;
       if (level === 'subject') {
-        endpoint = `/api/quizzes/topics/${encodeURIComponent(item)}`;
+        endpoint = `/assessment/topics/${encodeURIComponent(item)}`;
       } else if (level === 'topic') {
-        endpoint = `/api/quizzes/subtopics/${encodeURIComponent(item)}`;
+        endpoint = `/assessment/subtopics/${encodeURIComponent(item)}`;
       } else if (level === 'subtopic') {
-        endpoint = `/api/quizzes/concepts/${encodeURIComponent(item)}`;
+        endpoint = `/assessment/concepts/${encodeURIComponent(item)}`;
       }
       
       if (endpoint) {
-        const response = await axios.get(`http://localhost:8000${endpoint}`,{
+        const response = await axios.get(`${API_URL}${endpoint}`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -1662,12 +1583,15 @@ const AssessmentConfigModal = ({ open, handleClose, item, level, navigate }) => 
   
   const handleStartAssessment = () => {
     handleClose();
-    // Navigate to assessment with these parameters
+    // Include parent information from props
     navigate('/assessment', { 
       state: { 
         level,
         item, 
-        config
+        config: {
+          ...config,
+          considerHistory: config.considerHistory // Pass this parameter
+        }
       }
     });
   };
@@ -1692,20 +1616,21 @@ const AssessmentConfigModal = ({ open, handleClose, item, level, navigate }) => 
     return 'items';
   };
 
+
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
       <DialogTitle>
         <Box display="flex" alignItems="center">
-          <AssessmentIcon sx={{ mr: 1 }} />
+          <AssessmentIcon sx={{ mr: 1 }} fontSize="small" />
           Configure Assessment
         </Box>
       </DialogTitle>
       <DialogContent>
-        <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 500 }}>
+        <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 500 }}>
           {level ? `${level.charAt(0).toUpperCase() + level.slice(1)}: ` : ''}<strong>{item || ''}</strong>
         </Typography>
         
-        <FormControl fullWidth margin="normal">
+        <FormControl fullWidth margin="normal" size="small">
           <InputLabel>Number of Questions</InputLabel>
           <Select
             value={config.numQuestions}
@@ -1718,7 +1643,7 @@ const AssessmentConfigModal = ({ open, handleClose, item, level, navigate }) => 
           </Select>
         </FormControl>
 
-        <FormControl fullWidth margin="normal">
+        {/* <FormControl fullWidth margin="normal" size="small">
           <InputLabel>Difficulty</InputLabel>
           <Select
             value={config.difficulty}
@@ -1729,9 +1654,9 @@ const AssessmentConfigModal = ({ open, handleClose, item, level, navigate }) => 
             <MenuItem value="hard">Hard</MenuItem>
             <MenuItem value="mixed">Mixed</MenuItem>
           </Select>
-        </FormControl>
+        </FormControl> */}
 
-        <FormControl fullWidth margin="normal">
+        <FormControl fullWidth margin="normal" size="small">
           <InputLabel>Time Limit</InputLabel>
           <Select
             value={config.timeLimit}
@@ -1744,45 +1669,6 @@ const AssessmentConfigModal = ({ open, handleClose, item, level, navigate }) => 
             <MenuItem value={30}>30 minutes</MenuItem>
           </Select>
         </FormControl>
-
-         {/* <FormControl component="fieldset" fullWidth margin="normal">
-          <FormLabel component="legend">Question Types</FormLabel>
-          <FormGroup>
-            <FormControlLabel
-              control={<Checkbox checked={config.questionTypes.includes('multiple-choice')} 
-                onChange={(e) => {
-                  const newTypes = e.target.checked
-                    ? [...config.questionTypes, 'multiple-choice']
-                    : config.questionTypes.filter(t => t !== 'multiple-choice');
-                  setConfig({...config, questionTypes: newTypes});
-                }}
-              />}
-              label="Multiple Choice"
-            />
-            <FormControlLabel
-              control={<Checkbox checked={config.questionTypes.includes('open-ended')} 
-                onChange={(e) => {
-                  const newTypes = e.target.checked
-                    ? [...config.questionTypes, 'open-ended']
-                    : config.questionTypes.filter(t => t !== 'open-ended');
-                  setConfig({...config, questionTypes: newTypes});
-                }}
-              />}
-              label="Open Ended"
-            />
-            <FormControlLabel
-              control={<Checkbox checked={config.questionTypes.includes('true-false')} 
-                onChange={(e) => {
-                  const newTypes = e.target.checked
-                    ? [...config.questionTypes, 'true-false']
-                    : config.questionTypes.filter(t => t !== 'true-false');
-                  setConfig({...config, questionTypes: newTypes});
-                }}
-              />}
-              label="True/False"
-            />
-          </FormGroup>
-        </FormControl>  */}
 
         {/* Include all toggle and item selection */}
         {level && (level === 'subject' || level === 'topic' || level === 'subtopic') && (
@@ -1862,179 +1748,40 @@ const AssessmentConfigModal = ({ open, handleClose, item, level, navigate }) => 
             )}
           </>
         )}
+
+        <FormControlLabel
+          control={
+            <Switch 
+              checked={config.considerHistory}
+              onChange={(e) => setConfig({...config, considerHistory: e.target.checked})}
+              size="small"
+            />
+          }
+          label={
+            <Typography variant="body2">
+              Consider my performance history when selecting questions
+            </Typography>
+          }
+          sx={{ mt: 1, mb: 0.5 }}
+        />
+
+        <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+          <Button onClick={handleClose} size="small">
+            Cancel
+          </Button>
+          <Button 
+            variant="contained" 
+            color="primary"
+            onClick={() => handleStartAssessment()}
+            size="small"
+          >
+            Start Assessment
+          </Button>
+        </Box>
       </DialogContent>
-      <DialogActions>
-        <Button onClick={handleClose}>Cancel</Button>
-        <Button 
-          variant="contained" 
-          color="primary"
-          onClick={handleStartAssessment}
-          disabled={!config.includeSubtopics && config.selectedItems.length === 0}
-          startIcon={<PlayArrowIcon />}
-        >
-          Start Assessment
-        </Button>
-      </DialogActions>
     </Dialog>
   );
 };
 
-// New component for hierarchical visualization
-
-const KnowledgeMap = ({ subject, topic, subtopic, handleSubjectClick, handleTopicClick, handleSubtopicClick, handleConceptClick }) => {
-  return (
-    <Box sx={{ 
-      height: 500, 
-      border: '1px solid #e0e0e0', 
-      borderRadius: 2, 
-      p: 2,
-      mb: 4,
-      position: 'relative',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      flexDirection: 'column'
-    }}>
-      <Typography variant="h6" gutterBottom>Knowledge Map</Typography>
-      <Typography color="textSecondary">
-        Visualization is coming soon! This will show the relationships between subjects, topics, subtopics, and concepts.
-      </Typography>
-      <Button 
-        variant="outlined" 
-        color="primary" 
-        sx={{ mt: 2 }}
-        onClick={() => alert('Force graph visualization will be implemented soon.')}
-      >
-        Preview Concept Map
-      </Button>
-    </Box>
-  );
-};
-
-// EmptyState component for showing meaningful guidance when no content exists
-const EmptyState = ({ type, parentName, onUploadClick, onCreateClick }) => {
-  // Configure content based on type
-  const content = {
-    subjects: {
-      title: "No Subjects Available Yet",
-      description: "You haven't created any quiz subjects yet. Upload study materials and generate questions, or create a subject manually.",
-      primaryButton: "Upload Study Material",
-      primaryIcon: <UploadFileIcon />,
-      secondaryButton: "Create Subject Manually",
-      secondaryIcon: <AddIcon />,
-      image: "https://img.icons8.com/fluency/240/000000/empty-box.png"
-    },
-    topics: {
-      title: `No Topics in ${parentName}`,
-      description: `The ${parentName} subject doesn't have any topics yet. Topics are created automatically when you study documents related to ${parentName}.`,
-      primaryButton: "Upload Study Material",
-      primaryIcon: <UploadFileIcon />,
-      secondaryButton: "Create Topic Manually",
-      secondaryIcon: <AddIcon />,
-      image: "https://img.icons8.com/fluency/240/000000/open-book.png"
-    },
-    subtopics: {
-      title: `No Subtopics in ${parentName}`,
-      description: `The ${parentName} topic doesn't have any subtopics yet. Continue studying materials about ${parentName} to generate quizzes automatically.`,
-      primaryButton: "Upload Study Material",
-      primaryIcon: <UploadFileIcon />,
-      secondaryButton: "Create Subtopic",
-      secondaryIcon: <AddIcon />,
-      image: "https://img.icons8.com/fluency/240/000000/bookmark.png"
-    },
-    concepts: {
-      title: `No Concepts in ${parentName}`,
-      description: `The ${parentName} subtopic doesn't have any concepts yet. Reading and generating questions from study materials will create concepts automatically.`,
-      primaryButton: "Upload Study Material",
-      primaryIcon: <UploadFileIcon />,
-      secondaryButton: "Create Concept",
-      secondaryIcon: <AddIcon />,
-      image: "https://img.icons8.com/fluency/240/000000/idea.png"
-    }
-  }[type];
-
-  return (
-    <Paper
-      elevation={0}
-      sx={{
-        p: 5,
-        textAlign: 'center',
-        borderRadius: 4,
-        backgroundColor: 'rgba(255,255,255,0.9)',
-        backdropFilter: 'blur(8px)',
-        border: '1px dashed #e0e0e0',
-        maxWidth: '800px',
-        mx: 'auto',
-        my: 5
-      }}
-    >
-      <img 
-        src={content.image} 
-        alt="Empty state illustration"
-        style={{ width: '120px', height: '120px', marginBottom: '1.5rem' }}
-      />
-      <Typography variant="h5" color="primary.main" gutterBottom sx={{ fontWeight: 600 }}>
-        {content.title}
-      </Typography>
-      <Typography variant="body1" color="text.secondary" paragraph sx={{ mb: 4, maxWidth: '600px', mx: 'auto' }}>
-        {content.description}
-      </Typography>
-      
-      <Box sx={{ display: 'flex', flexDirection: {xs: 'column', sm: 'row'}, justifyContent: 'center', gap: 2 }}>
-        <Button
-          variant="contained"
-          color="primary"
-          size="large"
-          onClick={onUploadClick}
-          startIcon={content.primaryIcon}
-          sx={{ 
-            borderRadius: '12px',
-            px: 3,
-            py: 1.5,
-            boxShadow: 2,
-            '&:hover': {
-              transform: 'translateY(-3px)',
-              boxShadow: 4,
-              transition: 'all 0.2s'
-            }
-          }}
-        >
-          {content.primaryButton}
-        </Button>
-        
-        <Button
-          variant="outlined"
-          color="primary"
-          size="large"
-          onClick={onCreateClick}
-          startIcon={content.secondaryIcon}
-          sx={{ 
-            borderRadius: '12px',
-            px: 3,
-            py: 1.5
-          }}
-        >
-          {content.secondaryButton}
-        </Button>
-      </Box>
-      
-      <Box sx={{ mt: 6, p: 3, bgcolor: 'info.50', borderRadius: 2, maxWidth: '600px', mx: 'auto' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-          <MenuBookIcon color="info" />
-          <Typography variant="subtitle1" color="info.main" fontWeight="500">How Quizzes Are Created</Typography>
-        </Box>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 1, textAlign: 'left' }}>
-          1. <strong>Upload documents</strong> to study in the platform
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 1, textAlign: 'left' }}>
-          2. <strong>Select text</strong> and click "Generate Questions" while reading
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 1, textAlign: 'left' }}>
-          3. <strong>Auto-generated quizzes</strong> appear here as you study, organized by subject
-        </Typography>
-      </Box>
-    </Paper>
-  );
-};
-
 export default Practice;
+

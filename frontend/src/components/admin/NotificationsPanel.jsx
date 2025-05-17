@@ -12,6 +12,7 @@ const NotificationsPanel = () => {
   const [responseText, setResponseText] = useState('');
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [showResponseModal, setShowResponseModal] = useState(false);
+  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
   useEffect(() => {
     fetchNotificationsAndRequests();
@@ -23,10 +24,10 @@ const NotificationsPanel = () => {
       const token = localStorage.getItem('token');
       
       const [notificationsRes, helpRequestsRes] = await Promise.all([
-        axios.get('http://localhost:8000/api/admin/notifications', {
+        axios.get(`${API_URL}/admin/notifications`  , {
           headers: { Authorization: `Bearer ${token}` }
         }),
-        axios.get('http://localhost:8000/api/help-requests', {
+        axios.get(`${API_URL}/help-requests`, {
           headers: { Authorization: `Bearer ${token}` }
         })
       ]);
@@ -45,7 +46,7 @@ const NotificationsPanel = () => {
     try {
       const token = localStorage.getItem('token');
       
-      await axios.patch(`http://localhost:8000/api/admin/notifications/${id}/read`, {}, {
+      await axios.patch(`${API_URL}/admin/notifications/${id}/read`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -74,7 +75,7 @@ const NotificationsPanel = () => {
     try {
       const token = localStorage.getItem('token');
       
-      await axios.post(`http://localhost:8000/api/help-request/${selectedRequest._id}/respond`, {
+      await axios.post(`${API_URL}/help-request/${selectedRequest._id}/respond`, {
         response: responseText
       }, {
         headers: { Authorization: `Bearer ${token}` }
@@ -100,7 +101,7 @@ const NotificationsPanel = () => {
     try {
       const token = localStorage.getItem('token');
       
-      await axios.delete('http://localhost:8000/api/admin/notifications/clear-read', {
+      await axios.delete(`${API_URL}/admin/notifications/clear-read`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -120,7 +121,7 @@ const NotificationsPanel = () => {
     try {
       const token = localStorage.getItem('token');
       
-      await axios.delete('http://localhost:8000/api/help-requests/clear-resolved', {
+      await axios.delete(`${API_URL}/help-requests/clear-resolved`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       

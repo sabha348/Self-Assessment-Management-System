@@ -17,11 +17,12 @@ const EditUser = () => {
   const [success, setSuccess] = useState('');
   const [showResetModal, setShowResetModal] = useState(false);
   const [tempPassword, setTempPassword] = useState('');
+  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const response = await axios.get(`http://localhost:8000/api/admin/users/${id}`, {
+        const response = await axios.get(`${API_URL}/admin/users/${id}`, {
           headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
         });
         
@@ -52,7 +53,7 @@ const EditUser = () => {
     e.preventDefault();
     try {
       const response = await axios.put(
-        `http://localhost:8000/api/admin/users/${id}`,
+        `${API_URL}/admin/users/${id}`,
         formData,
         { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
       );
@@ -70,7 +71,7 @@ const EditUser = () => {
   const resetPassword = async () => {
     try {
       const response = await axios.post(
-        `http://localhost:8000/api/admin/users/${id}/reset-password`,
+        `${API_URL}/admin/users/${id}/reset-password`,
         {},
         { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
       );

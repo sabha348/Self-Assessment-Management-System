@@ -6,8 +6,7 @@ import { Worker, Viewer } from '@react-pdf-viewer/core';
 import { defaultLayoutPlugin } from '@react-pdf-viewer/default-layout';
 import { thumbnailPlugin } from '@react-pdf-viewer/thumbnail';
 import { jwtDecode } from 'jwt-decode';
-
-
+import Joyride from 'react-joyride'; // Make sure this import is included
 
 // Import styles
 import '@react-pdf-viewer/core/lib/styles/index.css';
@@ -41,12 +40,12 @@ const PdfViewer = () => {
   const [startTime, setStartTime] = useState(Date.now());
   const [savedMarkers, setSavedMarkers] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
-  // Add timer-related state variables
+  // Timer-related state variables
   const [quizEndTime, setQuizEndTime] = useState(null);
   const [remainingTime, setRemainingTime] = useState(null);
   const [quizTimerInterval, setQuizTimerInterval] = useState(null);
 
-  // Add break notification related states
+  // Break notification related states
   const [recentScores, setRecentScores] = useState([]);
   const [showBreakNotification, setShowBreakNotification] = useState(false);
   const [notificationIgnored, setNotificationIgnored] = useState(false);
@@ -59,18 +58,71 @@ const PdfViewer = () => {
     OPTIMAL_CHARS: 500
   };
 
-  // Add after your other state declarations, around line 39
   const [lastActiveTimestamp, setLastActiveTimestamp] = useState(() => {
     // Initialize from localStorage or use current time
     const saved = localStorage.getItem(`last-active-${userId}`);
     return saved ? parseInt(saved, 10) : Date.now();
   });
 
-  // Create the plugins
   const defaultLayoutPluginInstance = defaultLayoutPlugin();
   const thumbnailPluginInstance = thumbnailPlugin();
+  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
-  
+  // Joyride tour state
+  const [runTour, setRunTour] = useState(false);
+  const [steps] = useState([
+    {
+      target: '.pdf-viewer-container',
+      content: 'Select text from the PDF document and click the "Generate" button that appears to create questions about what you\'ve read.',
+      title: 'Generate Questions Manually',
+      disableBeacon: true,
+      placement: 'top-start'
+    },
+    {
+      target: '.pdf-viewer-container',
+      content: 'Questions will also be automatically generated every 5 minutes as you read, allowing you to practice and test your understanding without interrupting your reading flow.',
+      title: 'Auto-Generated Questions',
+      placement: 'top-end'
+    },
+    {
+      target: '.save-result-button',
+      content: 'After answering questions, you can save your results temporarily in local storage. These will appear as markers on the right side of the document for quick reference.',
+      title: 'Save Your Results',
+    },
+    {
+      target: 'body',
+      content: 'If you receive 5 scores below 60%, a break suggestion will appear. Taking regular breaks improves retention and learning effectiveness. You can choose to take a break or continue reading.',
+      title: 'Break Suggestions',
+      placement: 'center'
+    }
+  ]);
+
+  // Check if user has seen this tour before
+  useEffect(() => {
+    if (userId) {
+      const hasSeenTour = localStorage.getItem(`hasSeenPdfViewerTour-${userId}`);
+      if (!hasSeenTour) {
+        // Short delay to ensure components are rendered
+        const timer = setTimeout(() => {
+          setRunTour(true);
+        }, 1500);
+        
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [userId]);
+
+  // Joyride callback handler
+  const handleJoyrideCallback = (data) => {
+    const { status } = data;
+    if (status === 'finished' || status === 'skipped') {
+      setRunTour(false);
+      // Save that user has seen the tour
+      if (userId) {
+        localStorage.setItem(`hasSeenPdfViewerTour-${userId}`, 'true');
+      }
+    }
+  };
 
   useEffect(() => {
     const handleTextSelection = () => {
@@ -142,7 +194,6 @@ const PdfViewer = () => {
     setStartTime(Date.now());
   }, []);
 
-  // Add this effect to verify authentication on component mount
   useEffect(() => {
     // Validate token and user ID early
     if (!token) {
@@ -187,8 +238,8 @@ const PdfViewer = () => {
           'mix' : questionSettings.questionTypes[0];
       
       const loadingToast = toast.loading('Generating questions...');
-      
-      const response = await axios.post('http://localhost:8000/api/assessment', {
+
+      const response = await axios.post(`${API_URL}/quizzes`, {
         text: selectedText,
         numQuestions: questionSettings.numQuestions,
         userId: userId,
@@ -204,15 +255,19 @@ const PdfViewer = () => {
         toast.error('Server error: Missing quiz information');
         return;
       }
+
+      // Get the quizId directly from response
+    const quizIdentifier = response.data.quizId;
+    
       
       setQuestions(response.data.questions);
-      setQuizId(response.data.quizId);
+      setQuizId(quizIdentifier);
       setShowQuestions(true);
       toast.dismiss(loadingToast);
       
       // Start timer if a time limit is set
       if (questionSettings.timeLimit > 0) {
-        startQuizTimer(questionSettings.timeLimit);
+        startQuizTimer(questionSettings.timeLimit, quizIdentifier);
       }
       
       // Clear selection and button
@@ -356,8 +411,8 @@ const handleAutoSubmission = useCallback(async () => {
       const questionType = questionSettings.questionTypes.includes('mixed') ? 
         'mix' : questionSettings.questionTypes.length > 1 ? 
           'mix' : questionSettings.questionTypes[0];
-      
-      const response = await axios.post('http://localhost:8000/api/assessment', {
+
+      const response = await axios.post(`${API_URL}/quizzes`, {
         text: newText,
         numQuestions: questionSettings.numQuestions,
         userId: userId,
@@ -383,13 +438,16 @@ const handleAutoSubmission = useCallback(async () => {
       console.log(`Updating last read position from ${lastReadPosition} to ${lastReadPosition + newText.length}`);
       setLastReadPosition(prevPos => prevPos + newText.length);
       
+      // Get quizId directly from response
+      const quizIdentifier = response.data.quizId;
+      
       setQuestions(response.data.questions);
-      setQuizId(response.data.quizId);
+      setQuizId(quizIdentifier);
       setShowQuestions(true);
       setIsTimerPaused(true); // Pause timer while showing questions
 
       if (questionSettings.timeLimit > 0) {
-        startQuizTimer(questionSettings.timeLimit);
+        startQuizTimer(questionSettings.timeLimit, quizIdentifier);
       }
     } 
     catch (error) {
@@ -418,11 +476,6 @@ const handleAutoSubmission = useCallback(async () => {
   setShowQuestions(false);
   setIsTimerPaused(false);  // Resume timer
   
-  // Remove this manual timer creation - let the effect handle it
-  // if (!autoSubmissionTimer) {
-  //   const timer = setInterval(handleAutoSubmission, 60 * 1000);
-  //   setAutoSubmissionTimer(timer);
-  // }
 };
 
   // Clear timer function
@@ -475,12 +528,11 @@ const checkForBreakNotification = useCallback(() => {
   }
 }, [recentScores, notificationIgnored, lastBreakTimestamp, userId]);
 
-// Add new functions after the checkForBreakNotification function
 
 // Track when a notification is shown to the user
 const trackBreakNotificationShown = useCallback(async () => {
   try {
-    const response = await axios.post('http://localhost:8000/api/user-analytics/break-notification', {
+    const response = await axios.post(`${API_URL}/analytics/break-notification`, {
       userId,
       eventType: 'notification_shown',
       timestamp: Date.now()
@@ -499,18 +551,21 @@ const trackBreakResponse = useCallback(async (response) => {
       eventType: response === 'accepted' ? 'break_taken' : 'break_ignored',
       timestamp: Date.now()
     };
-    const apiResponse = await axios.post('http://localhost:8000/api/user-analytics/break-notification', data);
+    const apiResponse = await axios.post(`${API_URL}/analytics/break-notification`, data);
     console.log('Break response tracked:', apiResponse.data);
   } catch (error) {
     console.error('Error tracking break response:', error);
   }
 }, [userId]);
 
-  // Modified submit handler with useCallback and debugging
-const handleSubmitAnswers = useCallback(async (isTimeUp = false) => {
-  console.log('Submitting answers with:', { quizId, userId, isTimeUp, remainingTime });
+  // Submit handler
+const handleSubmitAnswers = useCallback(async (isTimeUp = false, explicitQuizId = quizId) => {
+  // Use explicitly passed quizId or fall back to state
+  const submissionQuizId = explicitQuizId || quizId;
   
-  if (!quizId) {
+  console.log('Submitting answers with:', { quizId: submissionQuizId, userId, isTimeUp, remainingTime });
+  
+  if (!submissionQuizId) {
     console.error('Missing quiz ID');
     toast.error("Missing quiz ID. Please try again.");
     return;
@@ -522,8 +577,19 @@ const handleSubmitAnswers = useCallback(async (isTimeUp = false) => {
     return;
   }
 
+  // Check if there are unanswered questions
+  const answeredQuestionsCount = Object.keys(answers).length;
+  const unansweredCount = questions.length - answeredQuestionsCount;
+  
+  // Show confirmation only if there are unanswered questions
+  if (unansweredCount > 0 && !isTimeUp) {
+    if (!window.confirm(`You have ${unansweredCount} unanswered question${unansweredCount > 1 ? 's' : ''}. These will be marked as "unanswered". Do you want to continue?`)) {
+      return; // User canceled submission
+    }
+  }
+
   // Only show "Time's up" if isTimeUp is true AND remainingTime is actually at or near zero
-  const showTimeUpMessage = isTimeUp && (!remainingTime || remainingTime <= 1000);
+  const showTimeUpMessage = isTimeUp && (!remainingTime);
   const toastId = toast.loading(showTimeUpMessage ? "Time's up! Submitting answers..." : "Submitting answers...");
 
   try {
@@ -533,15 +599,13 @@ const handleSubmitAnswers = useCallback(async (isTimeUp = false) => {
     // Calculate time taken in seconds
     const timeTaken = Math.floor((Date.now() - startTime) / 1000);
     
-    // Convert answers object to use questionId keys
+    // Create formatted answers with "unanswered" for missing answers
     const formattedAnswers = {};
     questions.forEach((question, index) => {
-      if (answers[index]) {
-        formattedAnswers[index] = answers[index];
-      }
+      formattedAnswers[index] = answers[index] || "unanswered";
     });
 
-    const response = await axios.post(`http://localhost:8000/api/assessment/${quizId}/submit`, {
+    const response = await axios.post(`${API_URL}/quizzes/${quizId}/submit`, {
       answers: formattedAnswers,
       userId: userId,
       timeTaken: timeTaken,
@@ -579,7 +643,7 @@ const handleSubmitAnswers = useCallback(async (isTimeUp = false) => {
     console.error('Error submitting answers:', error);
     toast.error('Failed to submit answers. Please try again.');
   }
-}, [quizId, userId, questions, answers, startTime, clearQuizTimer, checkForBreakNotification]);
+}, [quizId, userId, questions, answers, startTime, clearQuizTimer, checkForBreakNotification, remainingTime, quizTimerInterval]);
 
   // Resume timer when results are closed
   const handleCloseResults = () => {
@@ -689,12 +753,16 @@ const formatTime = (ms) => {
   return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 };
 
-// Start quiz timer function with fixed dependencies
-const startQuizTimer = useCallback((timeLimit) => {
+// Start quiz timer function with a completely different approach
+const startQuizTimer = useCallback((timeLimit, explicitQuizId) => {
   // Clear any existing timer
   if (quizTimerInterval) {
     clearInterval(quizTimerInterval);
   }
+  
+  // Store the quiz ID in a ref to ensure it persists
+  const currentQuizId = explicitQuizId;
+  console.log('Starting timer for quizId:', currentQuizId);
   
   // Calculate end time
   const endTime = Date.now() + (timeLimit * 60 * 1000);
@@ -712,14 +780,71 @@ const startQuizTimer = useCallback((timeLimit) => {
       clearInterval(timerInterval);
       setRemainingTime(0);
       
-      // Get the CURRENT quiz ID, not the one from closure
-      handleSubmitAnswers(true); // This will check quizId internally
+      // Use a completely different approach - direct submission with current quiz ID
+      console.log('Timer expired, submitting with quizId:', currentQuizId);
+      
+      // Set up timeout notification
+      const toastId = toast.loading("Time's up! Submitting answers...");
+      
+      // Create formatted answers with "unanswered" for missing answers
+      const formattedAnswers = {};
+      questions.forEach((question, index) => {
+        formattedAnswers[index] = answers[index] || "unanswered";
+      });
+      
+      // Calculate time taken in seconds
+      const timeTaken = Math.floor((Date.now() - startTime) / 1000);
+      console.log("formattedAnswers", formattedAnswers);
+      
+      // Direct API call without going through handleSubmitAnswers
+      axios.post(`${API_URL}/quizzes/${currentQuizId}/submit`, {
+        answers: formattedAnswers,
+        userId: userId,
+        timeTaken: timeTaken,
+      })
+      .then(response => {
+        toast.dismiss(toastId);
+        
+        // Calculate score percentage
+        const scorePercentage = ((response.data.totalScore / questions.length) * 100);
+        
+        // Add score to recent scores
+        setRecentScores(prev => {
+          const newScores = [
+            ...prev, 
+            { 
+              percentage: scorePercentage, 
+              timestamp: Date.now(),
+              quizId: currentQuizId
+            }
+          ];
+          
+          // Keep only the last 10 scores for memory efficiency
+          return newScores.slice(-10);
+        });
+        
+        setEvaluationResults(response.data);
+        setShowQuestions(false);
+        setShowResults(true);
+        
+        // Reset timer states
+        setQuizTimerInterval(null);
+        setQuizEndTime(null);
+        setRemainingTime(null);
+        
+        // After processing the score, check if a break notification is needed
+        checkForBreakNotification();
+      })
+      .catch(error => {
+        toast.dismiss(toastId);
+        console.error('Error submitting answers:', error);
+        toast.error('Failed to submit answers. Please try again.');
+      });
     }
   }, 1000);
   
   setQuizTimerInterval(timerInterval);
-}, [handleSubmitAnswers, quizTimerInterval]);
-
+}, [userId, questions, answers, startTime, checkForBreakNotification]);
 
 
 // Clean up timers on unmount
@@ -807,7 +932,6 @@ const BreakNotificationModal = () => (
 );
 
 
-// Add this with your other component mount useEffect hooks
 useEffect(() => {
   // Load break notification state from localStorage
   const savedLastBreak = localStorage.getItem(`last-break-${userId}`);
@@ -875,12 +999,27 @@ useEffect(() => {
     document.removeEventListener('visibilitychange', handleVisibilityChange);
     window.removeEventListener('beforeunload', handleBeforeUnload);
   };
-}, [userId, notificationIgnored]); // Remove lastActiveTimestamp from dependencies
-
+}, [userId, notificationIgnored]); 
 
   return (
     <div className="min-h-screen bg-gray-100 p-8">
-      {/* Add Toaster component */}
+      {/*  Joyride component */}
+      <Joyride
+        steps={steps}
+        run={runTour}
+        continuous={true}
+        showProgress={true}
+        showSkipButton={true}
+        callback={handleJoyrideCallback}
+        styles={{
+          options: {
+            primaryColor: '#3b82f6',
+            zIndex: 10000,
+          }
+        }}
+      />
+      
+      {/* Toaster component */}
       <Toaster 
         position="top-right"
         toastOptions={{
@@ -1002,9 +1141,8 @@ useEffect(() => {
                 Cancel
               </button>
               <button
-                onClick={handleSubmitAnswers}
+                onClick={() => handleSubmitAnswers(false, quizId)}
                 className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-                disabled={!Object.keys(answers).length}
               >
                 Submit All
               </button>
@@ -1032,7 +1170,7 @@ useEffect(() => {
                     isSaving 
                       ? 'bg-gray-400 cursor-not-allowed' 
                       : 'bg-green-500 hover:bg-green-600'
-                  } text-white rounded-lg transition-colors`}
+                  } text-white rounded-lg transition-colors save-result-button`}
                 >
                   {isSaving ? 'Saving...' : 'Save Result'}
                 </button>
@@ -1144,8 +1282,8 @@ useEffect(() => {
           </button>
         )}
 
-        {/* PDF Viewer Container */}
-        <div className="bg-white rounded-lg shadow-sm relative" style={{ height: 'calc(100vh - 150px)' }}>
+        {/* PDF Viewer Container - add the class for Joyride targeting */}
+        <div className="bg-white rounded-lg shadow-sm relative pdf-viewer-container" style={{ height: 'calc(100vh - 150px)' }}>
           {/* Markers */}
           <div className="absolute right-0 top-0 h-full">
             {savedMarkers.map(marker => (

@@ -10,6 +10,7 @@ const Balance = () => {
     startDate: '',
     endDate: ''
   });
+  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
   useEffect(() => {
     fetchBalanceData();
@@ -27,9 +28,9 @@ const Balance = () => {
       if (dateRange.endDate) {
         queryParams += queryParams ? `&endDate=${dateRange.endDate}` : `endDate=${dateRange.endDate}`;
       }
-      
-      const url = `http://localhost:8000/api/admin/balance${queryParams ? '?' + queryParams : ''}`;
-      
+
+      const url = `${API_URL}/admin/balance${queryParams ? '?' + queryParams : ''}`;
+
       const response = await axios.get(url, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });

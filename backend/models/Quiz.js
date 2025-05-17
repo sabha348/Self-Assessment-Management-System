@@ -3,7 +3,7 @@ const Schema = mongoose.Schema;
 
 const quizSchema = new Schema({
   numberOfQuestions: { type: Number, required: true }, // Total number of questions in the quiz
-  createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true }, // Reference to the user who created the quiz
+  userId: { type: Schema.Types.ObjectId, ref: "User", required: true }, // Reference to the user who created the quiz
   createdAt: { type: Date, default: Date.now }, // Timestamp when the quiz was created
   difficulty: { type: String, enum: ["easy", "medium", "hard", "mixed"], required: true }, // Difficulty level of the quiz
   type: { 

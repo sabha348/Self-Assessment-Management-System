@@ -4,6 +4,7 @@ export const reportError = async (error, componentName = 'Unknown') => {
   try {
     const token = localStorage.getItem('token');
     const user = JSON.parse(localStorage.getItem('user')) || {};
+    const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
     
     // Ensure we have these fields for error reporting
     const payload = {
@@ -16,8 +17,8 @@ export const reportError = async (error, componentName = 'Unknown') => {
     };
     
     console.log("Reporting error with payload:", payload);
-    
-    await axios.post('http://localhost:8000/api/errors/report', payload, {
+
+    await axios.post(`${API_URL}/errors/report`, payload, {
       headers: { Authorization: token ? `Bearer ${token}` : '' }
     });
   } catch (reportingError) {

@@ -1,4 +1,3 @@
-// src/App.js
 import React, { Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Provider } from 'react-redux';
@@ -12,21 +11,16 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import './services/axiosSetup';
 import { CircularProgress, Box } from '@mui/material';
 
-// Import Route Components
 import Logout from './components/auth/Logout';
 import Login from './components/auth/Login';
 import Register from './components/auth/Register';
 import Dashboard from './pages/Dashboard';
-import PrivateRoute from './components/common/PrivateRoute';
-import QuestionGenerator from './components/questions/QuestionGenerator';
-import UserProfile from './components/profile/UserProfile';
 import NotFound from './pages/NotFound';
 import PdfViewer from './pages/PdfViewer';
 import FilesList from './pages/FilesList';
 import Timetable from './pages/Timetable';
 import ProfileMenu from './pages/ProfileMenu';
 import AddEntry from './components/AddEntry';
-// New imports
 import Practice from './pages/Practice';
 import Assessment from './pages/Assessment';
 import SkillAnalysis from './pages/SkillAnalysis';
@@ -37,8 +31,6 @@ import ProUpgradeModal from './pages/ProUpgradeModal';
 import AdminRoute from './components/AdminRoute';
 import AdminLayout from './components/admin/AdminLayout';
 import UserManagement from './components/admin/UserManagement';
-import Analytics from './components/admin/Analytics';
-import SubscriptionManagement from './components/admin/SubscriptionManagement';
 import Settings from './components/admin/Settings';
 import UserDetail from './components/admin/UserDetail';
 import EditUser from './components/admin/EditUser';
@@ -59,7 +51,7 @@ const theme = createTheme({
   },
 });
 
-// Create an AuthGuard component
+// AuthGuard component
 const AuthGuard = ({ children }) => {
   const { user, loading } = useAuth(); // Your auth hook
   
@@ -104,8 +96,6 @@ function App() {
                         <Route path="users" element={<UserManagement />} />
                         <Route path="users/:id" element={<UserDetail />} />
                         <Route path="users/:id/edit" element={<EditUser />} />
-                        <Route path="analytics" element={<Analytics />} />
-                        <Route path="subscriptions" element={<SubscriptionManagement />} />
                         <Route path="notifications" element={<NotificationsPanel />} />
                         <Route path="settings" element={<Settings />} />
                         <Route path="balance" element={<Balance />} />
@@ -119,9 +109,7 @@ function App() {
                       <Route 
                         path="/dashboard" 
                         element={
-                          // <PrivateRoute>
                             <Dashboard />
-                          //  </PrivateRoute>
                         } 
                       />
 
@@ -152,22 +140,10 @@ function App() {
                       <Route path="/practice" element={<Practice />} />
                       <Route path="/skills" element={<SkillAnalysis />} />
                       <Route path="/assessment" element={<Assessment />} />
-                      <Route path="/questions" element={<QuestionGenerator />} />
 
                       {/* Timetable Routes */}
                       <Route path="/timetable" element={<Timetable />} />
                       <Route path="/entry" element={<AddEntry />} />
-                      
-                      {/* Profile Routes */}
-                      <Route path="/profile/menu" element={<ProfileMenu />} />
-                      <Route 
-                        path="/profile" 
-                        element={
-                          <PrivateRoute>
-                            <UserProfile />
-                          </PrivateRoute>
-                        } 
-                      />
 
                         {/* Stripe  */}
                         <Route path="/payment-success" element={<PaymentSuccess />} />

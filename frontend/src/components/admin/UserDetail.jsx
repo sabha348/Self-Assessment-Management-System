@@ -9,11 +9,12 @@ const UserDetail = () => {
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
   useEffect(() => {
     const fetchUserData = async () => {
       try {
-        const response = await axios.get(`http://localhost:8000/api/admin/users/${id}`, {
+        const response = await axios.get(`${API_URL}/admin/users/${id}`, {
           headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
         });
         

@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { reportError } from './errorReportingService';
 
-// Add a response interceptor for global error handling
+// Response interceptor for global error handling
 axios.interceptors.response.use(
   response => response,
   error => {

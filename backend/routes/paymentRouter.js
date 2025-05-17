@@ -12,8 +12,7 @@ router.post("/create-checkout-session", authenticateToken, async (req, res) => {
     try {
         const userId = req.user.userId;
         console.log("Creating checkout session for user:", userId);
-        // console.log(stripe);
-
+        
         const session = await stripe.checkout.sessions.create({
             payment_method_types: ["card"],
             mode: "payment",
@@ -36,11 +35,6 @@ router.post("/create-checkout-session", authenticateToken, async (req, res) => {
             metadata: { userId: userId.toString() },
         });
 
-        // console.log("Checkout session created:", {
-        //     sessionId: session.id,
-        //     userId: userId,
-        //     email: req.user.email
-        // });
         console.log("im here");
         res.json({ url: session.url });
     } catch (error) {
@@ -53,8 +47,7 @@ router.post("/create-checkout-session", authenticateToken, async (req, res) => {
 router.post("/confirm-payment", async (req, res) => {
     try {
         const { session_id } = req.body;
-        // console.log("Confirming payment for session:", session_id);
-
+        
         if (!session_id) {
             console.error("No session_id provided in request");
             return res.status(400).json({ error: "No session_id provided" });
@@ -65,14 +58,7 @@ router.post("/confirm-payment", async (req, res) => {
             expand: ['payment_intent']
         });
 
-        // console.log("Session details:", {
-        //     paymentStatus: session.payment_status,
-        //     sessionStatus: session.status,
-        //     metadata: session.metadata,
-        //     customerId: session.customer,
-        //     email: session.customer_email
-        // });
-
+        
         if (session.payment_status === "paid") {
             const userId = session.metadata.userId;
 
@@ -81,8 +67,7 @@ router.post("/confirm-payment", async (req, res) => {
                 return res.status(400).json({ error: "Invalid session metadata" });
             }
 
-            // console.log("Updating membership for user:", userId);
-
+        
             // Update user's membership with error handling
             const updatedUser = await User.findByIdAndUpdate(
                 userId,
@@ -142,12 +127,7 @@ router.post("/confirm-payment", async (req, res) => {
                 }
             });
 
-            // console.log("Membership updated successfully:", {
-            //     userId: updatedUser._id,
-            //     membership: updatedUser.membership,
-            //     expiryDate: updatedUser.membershipExpiry
-            // });
-
+            
             return res.json({
                 message: "Payment successful! Membership upgraded.",
                 user: {
@@ -157,11 +137,7 @@ router.post("/confirm-payment", async (req, res) => {
             });
         }
 
-        // console.log("Payment not completed:", {
-        //     paymentStatus: session.payment_status,
-        //     sessionStatus: session.status
-        // });
-
+        
         res.status(400).json({ error: "Payment not completed" });
     } catch (error) {
         console.error("Error confirming payment:", {

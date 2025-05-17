@@ -65,21 +65,6 @@ const ResultsDisplay = ({ results, onFinish }) => (
         </Box>
       </Box>
       
-      {/* <LinearProgress
-        variant="determinate"
-        value={results.score}
-        sx={{ 
-          height: 10, 
-          borderRadius: 5,
-          mb: 3,
-          backgroundColor: '#e0e0e0',
-          '& .MuiLinearProgress-bar': {
-            backgroundColor: results.score >= 70 ? '#4caf50' : 
-                             results.score >= 50 ? '#ff9800' : '#f44336'
-          }
-        }}
-      /> */}
-      
       <Divider sx={{ my: 2 }} />
       
       <Typography variant="h6" gutterBottom>Question Review:</Typography>
@@ -175,34 +160,7 @@ const Assessment = () => {
   const [assessmentComplete, setAssessmentComplete] = useState(false);
   const [results, setResults] = useState(null);
   const [flaggedQuestions, setFlaggedQuestions] = useState({});
-
-  // Debug the config object
-  console.log("Assessment config:", {
-    level,
-    item,
-    configObj: config,
-    hasSubject: !!config?.subject,
-    hasTopic: !!config?.topic,
-    hasSubtopic: !!config?.subtopic
-  });
-
-  // Ensure parent fields are set based on navigation context
-  const parentSubject = level === 'subject' ? null : 
-                       (level === 'topic' ? item : 
-                       (config?.subject || null));
-
-  const parentTopic = level === 'subject' || level === 'topic' ? null : 
-                     (level === 'subtopic' ? item :
-                     (config?.topic || null));
-
-  const parentSubtopic = level !== 'concept' ? null : 
-                       (config?.subtopic || null);
-
-  console.log("Parent relationships:", {
-    parentSubject,
-    parentTopic,
-    parentSubtopic
-  });
+  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
   useEffect(() => {
     // Fetch appropriate questions based on level and item
@@ -212,13 +170,13 @@ const Assessment = () => {
         
         let endpoint;
         if (level === 'concept') {
-          endpoint = `/api/quizzes/questions/concept/${encodeURIComponent(item)}`;
+          endpoint = `/assessment/questions/concept/${encodeURIComponent(item)}`;
         } else if (level === 'subtopic') {
-          endpoint = `/api/quizzes/questions/subtopic/${encodeURIComponent(item)}`;
+          endpoint = `/assessment/questions/subtopic/${encodeURIComponent(item)}`;
         } else if (level === 'topic') {
-          endpoint = `/api/quizzes/questions/topic/${encodeURIComponent(item)}`;
+          endpoint = `/assessment/questions/topic/${encodeURIComponent(item)}`;
         } else { // subject
-          endpoint = `/api/quizzes/questions/subject/${encodeURIComponent(item)}`;
+          endpoint = `/assessment/questions/subject/${encodeURIComponent(item)}`;
         }
         
         // Add query params for configuration
@@ -226,9 +184,9 @@ const Assessment = () => {
         
         if (config.includeSubtopics) {
           endpoint += '&includeSubItems=true';
-        } else if (config.includedItems && config.includedItems.length > 0) {
+        } else if (config.selectedItems && config.selectedItems.length > 0) {
           // Add selected items as query parameter when not including all
-          const itemsParam = config.includedItems.map(encodeURIComponent).join(',');
+          const itemsParam = config.selectedItems.map(encodeURIComponent).join(',');
           endpoint += `&selectedItems=${itemsParam}`;
         }
         
@@ -237,9 +195,12 @@ const Assessment = () => {
           endpoint += `&questionTypes=${config.questionTypes.join(',')}`;
         }
         
-        console.log('Fetching questions from endpoint:', endpoint);
+        // Add parameter to consider assessment history
+        endpoint += `&considerHistory=${config.considerHistory !== false ? 'true' : 'false'}`;
         
-        const response = await axios.get(`http://localhost:8000${endpoint}`,{
+        console.log('Fetching questions from endpoint:', endpoint);
+
+        const response = await axios.get(`${API_URL}${endpoint}`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`
           }
@@ -262,26 +223,25 @@ const Assessment = () => {
     fetchQuestions();
   }, [level, item, config]);
 
-  // Add the missing handleSubmit function
   const handleSubmit = async () => {
     try {
       setIsSubmitting(true);
       
       // Prepare answers for submission - include ALL questions
       const formattedAnswers = {};
+      const questionIdsMap = {};
+      
       questions.forEach((question, index) => {
         // Include all questions in submission, with explicit "unanswered" marker for empty ones
         formattedAnswers[index] = answers[index] || "__UNANSWERED__";
+        questionIdsMap[index] = question.questionId; // Add the questionId mapping
       });
-      
-      // Get quiz ID from the first question or use a default
-      const quizId = questions[0]?.quizeRef || 'default';
       
       // Get token for authentication
       const token = localStorage.getItem('token');
       let headers = {};
       let userId = '1'; // Default fallback
-
+  
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
         
@@ -295,13 +255,15 @@ const Assessment = () => {
         }
       }
       
-      const response = await axios.post(`http://localhost:8000/api/assessment/${quizId}/submit`, {
+      const response = await axios.post(`${API_URL}/assessment/submit`, {
         answers: formattedAnswers,
-        userId: userId, // Use the extracted userId here
+        questionIds: questionIdsMap, // Include the question IDs mapping
+        userId: userId, 
         timeTaken: Math.floor(config.timeLimit * 60 - timeRemaining),
-        includeUnanswered: true // Explicitly tell backend to process unanswered questions
+        includeUnanswered: true 
       }, { headers });
       
+      // Process response...
       setResults({
         score: (response.data.totalScore / questions.length) * 100,
         evaluations: response.data.evaluations,
@@ -312,38 +274,36 @@ const Assessment = () => {
       
       setAssessmentComplete(true);
       
-      // Store assessment results in the new model
-      try {
-        await axios.post('http://localhost:8000/api/mastery/save-assessment-result', {
-          userId: userId,
-          assessmentId: quizId,
-          level: level,
-          itemName: item,
-          parentSubject: parentSubject,
-          parentTopic: parentTopic,
-          parentSubtopic: parentSubtopic,
-          score: (response.data.totalScore / questions.length) * 100,
-          totalQuestions: questions.length,
-          correctAnswers: response.data.evaluations.filter(e => e.status === "correct").length,
-          timeTaken: Math.floor(config.timeLimit * 60 - timeRemaining),
-          date: new Date().toISOString(),
-          detailedResults: response.data.evaluations.map(evaluation => ({
-            questionId: evaluation.questionId,
-            // Map 'wrong' to 'incorrect' to match the schema's enum values
-            status: evaluation.status === "wrong" ? "incorrect" : evaluation.status,
-            conceptsEvaluated: evaluation.concepts || []
-          }))
-        }, { headers });
-      } catch (error) {
-        console.error("Failed to save assessment results:", error);
-      }
+    // Create questioninfo for the simplified model
+    const questioninfo = response.data.evaluations.map(evaluation => ({
+      questionId: evaluation.questionId,
+      status: evaluation.status === "wrong" ? "incorrect" : 
+              evaluation.status === "unanswered" ? "unanswered" : evaluation.status,
+      attempts: 1 // Default to 1 attempt for new assessments
+    }));
+    
+    // Store assessment results in the simplified model
+    try {
+      await axios.post(`${API_URL}/analytics/save-assessment-result`, {
+        userId: userId,
+        level: level,
+        itemName: item,
+        score: (response.data.totalScore / questions.length) * 100,
+        totalQuestions: questions.length,
+        timeTaken: Math.floor(config.timeLimit * 60 - timeRemaining),
+        date: new Date().toISOString(),
+        questioninfo: questioninfo
+      }, { headers });
     } catch (error) {
-      console.error("Error submitting assessment:", error);
-      setError("Failed to submit your assessment. Please try again.");
-    } finally {
-      setIsSubmitting(false);
+      console.error("Failed to save assessment results:", error);
     }
-  };
+  } catch (error) {
+    console.error("Error submitting assessment:", error);
+    setError("Failed to submit your assessment. Please try again.");
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   // Modify the submit button to use this function
   const confirmSubmit = () => {
@@ -393,7 +353,7 @@ const Assessment = () => {
             
             <LinearProgress 
               variant="determinate" 
-              value={((currentQuestionIndex) / questions.length) * 100}
+              value={((currentQuestionIndex + 1) / questions.length) * 100}
               sx={{ mt: 2, height: 8, borderRadius: 4 }}
             />
             

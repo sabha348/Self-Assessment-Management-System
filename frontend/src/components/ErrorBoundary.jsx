@@ -2,14 +2,28 @@ import React from 'react';
 import { reportError } from '../services/errorReportingService';
 
 class ErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
+constructor(props) {
+  super(props);
+  this.state = { hasError: false, error: null };
+}
 
-  static getDerivedStateFromError(error) {
-    return { hasError: true, error };
-  }
+static getDerivedStateFromError(error) {
+  return { hasError: true, error };
+}
+
+componentDidMount() {
+  // Catch module loading errors
+  window.addEventListener('error', event => {
+    if (event.error.message.includes("Cannot find module")) {
+      reportError({
+        message: `Module loading error: ${event.error.message}`,
+        stack: event.error.stack
+      }, 'AppLoad');
+      this.setState({ hasError: true, errorInfo: event.error });
+    }
+  });
+}
+
 
   componentDidCatch(error, info) {
     console.error('Component Error:', error, info);

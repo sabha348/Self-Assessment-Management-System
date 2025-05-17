@@ -6,6 +6,7 @@ const ProUpgradeModal = () => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const navigate = useNavigate();
+  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
   const handlePayment = async () => {
     try {
@@ -14,7 +15,7 @@ const ProUpgradeModal = () => {
 
       // Call backend to create Stripe session
       const { data } = await axios.post(
-        "http://localhost:8000/api/payment/create-checkout-session",
+        `${API_URL}/payment/create-checkout-session`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );

@@ -1,13 +1,14 @@
 import React, { useRef, useState, useEffect, useContext  } from 'react';
-import { Book, Brain, Calculator, Layers, PenTool, Folder, Plus, Home, CreditCard, FolderArchive, FolderCheck, Clock, Calendar, CalendarCheck,LucideUserRoundCog } from 'lucide-react';
+import { Book, Brain, Calculator, Layers, PenTool, Folder, Plus, Home, CreditCard, FolderArchive, FolderCheck, Clock, Calendar, CalendarCheck, LucideUserRoundCog } from 'lucide-react';
 import { uploadFile } from '../services/fileService';
 import { toast } from 'react-toastify';
-import { useLocation,useNavigate } from 'react-router-dom';
-import Logout from '../components/auth/Logout'; //imported the logout 
-import {useAuth} from '../contexts/AuthContext'; //imported the update user function from auth context
+import { useLocation, useNavigate } from 'react-router-dom';
+import Logout from '../components/auth/Logout';
+import { useAuth } from '../contexts/AuthContext';
 import ProfileMenu from './ProfileMenu';
 import axios from 'axios';
 import { jwtDecode } from "jwt-decode";
+import Joyride from 'react-joyride';
 
 const Dashboard = () => {
   const { updateUser } = useAuth();
@@ -20,6 +21,64 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
+  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
+  
+  // Add Joyride tour state
+  const [runTour, setRunTour] = useState(false);
+  const [steps, setSteps] = useState([
+    {
+      target: '.study-card',
+      content: 'Upload and study your notes, textbooks, and learning materials and get questions generated both manually or automatically as you read. Enhance your study sessions with our embedded PDF reader.',
+      title: 'Study',
+      disableBeacon: true,
+    },
+    {
+      target: '.practice-card',
+      content: 'Test your knowledge with interactive quizzes based on your study materials. Practice makes perfect!',
+      title: 'Practice Quiz',
+    },
+    {
+      target: '.skills-card',
+      content: 'Track your progress over time and identify your strengths and areas for improvement with detailed analytics.',
+      title: 'Skill Analysis',
+    },
+    {
+      target: '.timetable-icon',
+      content: 'Access and manage your weekly schedule to stay organized and never miss important classes or study sessions.',
+      title: 'Set Timetable',
+    },
+    {
+      target: '.timetable-section',
+      content: 'View your weekly schedule you have set.',
+      title: 'View Timetable',
+    },
+  ]);
+
+  // Check if user is new and should see the tour
+  useEffect(() => {
+    if (currentUser) {
+      const hasSeenTour = localStorage.getItem('hasSeenDashboardTour');
+      if (!hasSeenTour) {
+        setRunTour(true);
+        // Set flag after showing tour once
+        localStorage.setItem('hasSeenDashboardTour', 'true');
+      }
+    }
+  }, [currentUser]);
+
+  // Joyride callback handler
+  const handleJoyrideCallback = (data) => {
+    const { status } = data;
+    if (status === 'finished' || status === 'skipped') {
+      setRunTour(false);
+    }
+  };
+
+  // Reset tour button handler
+  const resetTour = () => {
+    localStorage.removeItem('hasSeenDashboardTour');
+    setRunTour(true);
+  };
 
   const handlePlusClick = () => {
     fileInputRef.current.click();
@@ -50,7 +109,7 @@ const Dashboard = () => {
         const userId = decoded.userId;
 
         // Fetch the latest user data from backend
-        const response = await axios.get(`http://localhost:8000/user/${userId}`, {
+        const response = await axios.get(`${API_URL}/user/${userId}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
 
@@ -64,8 +123,8 @@ const Dashboard = () => {
         setCurrentUser(userData); // Update state with fresh data
 
         // Update the AuthContext with the fetched user data
-        updateUser(userData); // Assuming you have updateUser function in your AuthContext
-      } catch (error) {
+        updateUser(userData); 
+            } catch (error) {
         console.error("Fetching user error:", error);
       }
     };
@@ -84,7 +143,7 @@ const Dashboard = () => {
           return;
         }
 
-        const response = await axios.get("http://localhost:8000/api/timetable", {
+        const response = await axios.get(`${API_URL}/timetable`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -163,6 +222,22 @@ const Dashboard = () => {
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
+      {/* Add Joyride component */}
+      <Joyride
+        steps={steps}
+        run={runTour}
+        continuous={true}
+        showProgress={true}
+        showSkipButton={true}
+        callback={handleJoyrideCallback}
+        styles={{
+          options: {
+            primaryColor: '#3b82f6',
+            zIndex: 10000,
+          }
+        }}
+      />
+
       <div className="flex flex-1">
         {/* Hidden file input */}
         <input
@@ -213,13 +288,15 @@ const Dashboard = () => {
           )}
           
           {/* Timetable Icon with Tooltip */}
-          <div className="relative group">
+          <div className="relative group timetable-icon">
+
             <div
               className="p-2 rounded-lg hover:bg-gray-100 cursor-pointer"
               onClick={() =>
-                currentUser?.membership === "premium" && currentUser !== null
-                  ? navigate("/timetable")
-                  : navigate("/upgradepro")
+                // currentUser?.membership === "premium" && currentUser !== null
+                  //? 
+                  navigate("/timetable")
+                  // : navigate("/upgradepro")
               }
             >
               <CalendarCheck className="w-6 h-6 text-gray-600" />
@@ -235,26 +312,37 @@ const Dashboard = () => {
           </div>
           
           {/* Pro Badge */}
-          {currentUser?.membership !== "premium" && (
+          {/* {currentUser?.membership !== "premium" && (
             <div
               className="mt-auto p-2 bg-black text-white rounded-lg cursor-pointer"
               onClick={() => navigate("/upgradepro")}
             >
               Pro
             </div>
-          )}
+          )} */}
           
           <ProfileMenu />
         </div>
 
         {/* Main Content */}
         <div className="flex-1 p-8 max-w-7xl mx-auto">
+          {/* Help button to restart tour */}
+          <div className="flex justify-end mb-2">
+            <button 
+              onClick={resetTour}
+              className="text-sm text-blue-600 hover:text-blue-800 flex items-center"
+            >
+              <span className="mr-1">Need help?</span> Take the tour
+            </button>
+          </div>
+
           {/* Studying Section */}
           <div className="mb-8">
             <h2 className="text-xl font-semibold mb-4">Studying</h2>
             <div className="grid grid-cols-3 gap-4">
-              {/* Study Card */}
-              <div className="p-6 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow"
+              {/* Study Card - add className for Joyride */}
+              <div 
+                className="p-6 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow study-card"
                 onClick={() => navigate('/files')}
               >
                 <Book className="w-6 h-6 mb-3 text-gray-600" />
@@ -262,8 +350,9 @@ const Dashboard = () => {
                 <p className="text-sm text-gray-500">Learn swiftly</p>
               </div>
               
-              {/* Practice Quiz Card */}
-              <div className="p-6 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow"
+              {/* Practice Quiz Card - add className for Joyride */}
+              <div 
+                className="p-6 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow practice-card"
                 onClick={() => navigate('/practice')}
               >
                 <Brain className="w-6 h-6 mb-3 text-gray-600" />
@@ -271,39 +360,27 @@ const Dashboard = () => {
                 <p className="text-sm text-gray-500">Test your knowledge</p>
               </div>
               
-              {/* Skill Analysis Card - NEW */}
+              {/* Skill Analysis Card - add className for Joyride */}
               <div
-                className="p-6 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow"
+                className="p-6 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow skills-card"
                 onClick={() =>
-                  currentUser.membership === "premium"
-                    ? navigate("/skills")
-                    : navigate("/upgradepro")
+                  // currentUser.membership === "premium"
+                    //? 
+                    navigate("/skills")
+                    // : navigate("/upgradepro")
                 }
               >
                 <Calculator className="w-6 h-6 mb-3 text-gray-600" />
                 <h3 className="font-medium">Skill Analysis</h3>
                 <p className="text-sm text-gray-500">Track your progress</p>
               </div>
-
             </div>
           </div>
 
           {/* Timetable Section */}
-          <div className="mt-8">
+          <div className="mt-8 timetable-section">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold">Timetable</h2>
-{/* <button 
-                className="p-2 hover:bg-gray-100 rounded-full"
-                onClick={() => navigate('/entry')}
-              >
-                <Plus className="w-5 h-5 text-gray-600" />
-              </button> */}
-{/* <button 
-                className="p-2 hover:bg-gray-100 rounded-full"
-                onClick={() => navigate('/entry')}
-              >
-                <Plus className="w-5 h-5 text-gray-600" />
-              </button> */}
             </div>
             
             {/* Keeping the existing timetable with API data */}

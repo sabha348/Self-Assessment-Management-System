@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 const Schema = mongoose.Schema;
-const Quiz = require('./Quiz'); // Import Quiz model
+const Quiz = require('./Quiz');
 
 const questionSchema = new Schema({
   questionId: { type: String, required: true },

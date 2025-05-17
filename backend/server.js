@@ -4,16 +4,16 @@ const cors = require("cors");
 const bodyParser = require("body-parser");
 const connectDB = require('./config/db');
 const userRoutes = require('./routes/userRouter');
+const folderRoutes = require('./routes/folderRoutes');
 const fileRoutes = require('./routes/fileRoutes');
 const timetableRoutes = require('./routes/timetableRoutes');
-const assessmentRoutes = require('./routes/assessmentRouter');
+const quizRoutes = require('./routes/quizRouter');
 const registerUser = require('./authentication/register');
 const loginUser = require('./authentication/login'); 
 const adminRoutes = require('./routes/adminRoutes');
 const { upload, uploadFile, getFiles } = require('./services/fileService');
-const quizRouter = require('./routes/quizRouter');
-const masteryRouter = require('./routes/masteryRouter'); // Add this line with your other router imports
-const userAnalyticsRouter = require('./routes/userAnalyticsRouter'); // Add this with your other router imports and registrations
+const assessmentRouter = require('./routes/assessmentRouter');
+const userAnalyticsRouter = require('./routes/userAnalyticsRouter'); // Add this line with your other router imports
 const mongoose = require('mongoose');
 // const upgradeMembership = require('./routes/membership');
 const paymentRoutes = require('./routes/paymentRouter'); 
@@ -31,7 +31,7 @@ connectDB();
 
 // Middleware
 app.use(cors({
-  origin: "http://localhost:3000",
+  origin: process.env.FRONTEND_URL || "http://localhost:3000",
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
   allowedHeaders: ["Content-Type", "Authorization"]
 }));
@@ -53,19 +53,19 @@ app.use(express.urlencoded({ limit: '100mb', extended: true, parameterLimit: 100
 app.use('/api', helpRequestRouter); // Add this line with your other app.use statements
 
 // Routes
-app.use('/api/assessment', assessmentRoutes);
+app.use('/api/quizzes', quizRoutes);
 app.use('/api/auth/register', registerUser);
 app.use('/api/auth/login', loginUser);
-app.use('/user', userRoutes);
+app.use('/api/user', userRoutes);
+app.use('/api/folders', folderRoutes);
 app.use('/api/files', fileRoutes);
 app.use('/api/timetable', timetableRoutes); // Keeping this existing route
-app.use('/api/quizzes', quizRouter); // Added new quiz router
+app.use('/api/assessment', assessmentRouter); // Added new quiz router
 app.use('/api/payment',paymentRoutes);
 app.use('/api/admin', adminRoutes);
 
 // app.use('/api/membership/upgrade',upgradeMembership);
-app.use('/api/mastery', masteryRouter); // Add this line with your other app.use statements
-app.use('/api/user-analytics', userAnalyticsRouter); // Add this with your other app.use statements
+app.use('/api/analytics', userAnalyticsRouter); // Add this line with your other app.use statements
 app.use('/api/errors', errorRoutes); // Add this with your other routes
 
 

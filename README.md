@@ -7,9 +7,8 @@ The Assessment Management System (SAMS) is a comprehensive web application desig
 ### Core Features
 - AI-powered question generation from uploaded content
 - Intelligent answer evaluation with detailed feedback
-- Multiple question formats (MCQ, Fill in the blanks, Open-ended)
+- Multiple question formats (MCQ, Fill in the blanks, Open-ended), for now open ended.
 - Performance analytics and progress tracking
-- Cloud storage integration (Google Drive)
 - Premium membership system
 
 ### Admin Features
@@ -35,14 +34,6 @@ The Assessment Management System (SAMS) is a comprehensive web application desig
   - Revenue reports
   - User engagement statistics
   - Feature usage analytics
-
-
-- System Configuration
-
-  - Manage subscription tiers
-  - Configure feature access per tier
-  - Set pricing
-  - Define usage limits
 
 
 ### Premium Features

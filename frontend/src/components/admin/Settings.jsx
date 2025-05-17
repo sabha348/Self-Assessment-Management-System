@@ -11,11 +11,12 @@ const Settings = () => {
   const [faviconPreview, setFaviconPreview] = useState(null);
   const [uploadingFavicon, setUploadingFavicon] = useState(false);
   const fileInputRef = useRef(null);
+  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
   
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const response = await axios.get('http://localhost:8000/api/admin/settings', {
+        const response = await axios.get(`${API_URL}/admin/settings`, {
           headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
         });
         
@@ -66,7 +67,7 @@ const Settings = () => {
     
     try {
       const response = await axios.post(
-        'http://localhost:8000/api/admin/settings/favicon',
+        `${API_URL}/admin/settings/favicon`,
         formData,
         {
           headers: {
@@ -96,7 +97,7 @@ const Settings = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.put('http://localhost:8000/api/admin/settings', settings, {
+      await axios.put(`${API_URL}/admin/settings`, settings, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
       

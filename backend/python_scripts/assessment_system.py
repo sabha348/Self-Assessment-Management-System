@@ -1,298 +1,4 @@
-# import os
-# from dotenv import load_dotenv
-# load_dotenv()
-# import google.generativeai as genai
-# import re
-# import difflib
-# from typing import List, Dict, Optional
 
-# class AssessmentSystem:
-#     def __init__(self,
-#                  api_key: str,
-#                  model: str = "gemini-2.0-flash-lite",
-#                  accuracy_threshold: int = 70,
-#                  difficulty_level: int = 1):
-#         """
-#         Initialize the Assessment Management System with configurable evaluation.
-
-#         :param api_key: Google API key
-#         :param model: The model to use (default is gemini-2.0-flash-lite)
-#         :param accuracy_threshold: Minimum accuracy percentage to consider an answer correct (default 70)
-#         :param difficulty_level: Difficulty level (1=low, 2=medium, 3=high) affecting keyword focus
-#         """
-#         try:
-#             self.api_key = api_key
-#             self.model = model
-            
-#             # Initialize Gemini with safety settings
-#             genai.configure(api_key=self.api_key)
-#             generation_config = {
-#                 "temperature": 0.7,
-#                 "top_p": 1,
-#                 "top_k": 1,
-#                 "max_output_tokens": 2048,
-#             }
-#             safety_settings = [
-#                 {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
-#                 {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
-#                 {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
-#                 {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
-#             ]
-            
-#             self.client = genai.GenerativeModel(
-#                 model_name=self.model,
-#                 generation_config=generation_config,
-#                 safety_settings=safety_settings
-#             )
-            
-#             # Test the connection
-#             response = self.client.generate_content("Test connection")
-#             if not response:
-#                 raise Exception("Failed to initialize Gemini client")
-            
-#             self.score = 0
-#             self.accuracy_threshold = accuracy_threshold
-#             self.difficulty_level = max(1, min(3, difficulty_level))  # Ensure valid range (1-3)
-
-#             # Difficulty-based evaluation configurations
-#             self.difficulty_configs = {
-#                 1: {'semantic_weight': 0.7, 'keyword_weight': 0.3, 'partial_match_bonus': 5},  # Low: Focus on meaning
-#                 2: {'semantic_weight': 0.5, 'keyword_weight': 0.5, 'partial_match_bonus': 2},  # Medium: Balanced
-#                 3: {'semantic_weight': 0.3, 'keyword_weight': 0.7, 'partial_match_bonus': 0}   # High: Focus on keywords
-#             }
-
-#         except Exception as e:
-#             print(f"Initialization error: {str(e)}")
-#             raise
-
-#     def _sanitize_response(self, text: str) -> str:
-#         """Normalize and clean AI response text."""
-#         if not text:
-#             return ""
-#         text = re.sub(r'\n+', '\n', text.strip())
-#         text = ''.join(c for c in text if ord(c) >= 32 or c == '\n')
-#         return text
-
-#     def generate_questions(self, input_text: str, num_questions: int = 2) -> List[str]:
-#         """
-#         Generate comprehension questions based on the input text.
-#         """
-#         if not input_text.strip():
-#             print("Error: Input text is empty")
-#             return []
-        
-#         prompt = f"""Generate {num_questions} high-quality, specific comprehension questions
-#         that directly test the key points of this text. Ensure questions are:
-#         - Clear and unambiguous
-#         - Directly based on the text's content
-#         - Require specific, factual answers
-
-#         Input Text: {input_text}
-
-#         Provide only the questions, without numbering or additional text."""
-
-#         try:
-#             response = self.client.generate_content(prompt)
-#             if not response or not response.text:
-#                 raise Exception("Empty response from API")
-            
-#             generated_text = self._sanitize_response(response.text)
-#             questions = []
-#             lines = [line.strip() for line in generated_text.split('\n') if line.strip()]
-#             for line in lines:
-#                 cleaned_line = re.sub(r'^\s*(\d+\.|\-|\*)\s*', '', line).strip()
-#                 if cleaned_line and not cleaned_line.isdigit():
-#                     questions.append(cleaned_line)
-            
-#             questions = questions[:num_questions]
-#             if not questions:
-#                 raise Exception("No valid questions generated")
-            
-#             return questions
-        
-#         except Exception as e:
-#             print(f"Question generation error: {str(e)}")
-#             return []
-
-#     def generate_correct_answers(self, input_text: str, questions: List[str]) -> List[str]:
-#         """
-#         Generate correct answers for the given questions.
-#         """
-#         correct_answers = []
-#         for question in questions:
-#             prompt = f"""Provide a precise, concise answer to the following question
-#             based strictly on the given context:
-
-#             Context: {input_text}
-#             Question: {question}
-
-#             Answer:"""
-
-#             try:
-#                 response = self.client.generate_content(prompt)
-#                 correct_answer = self._sanitize_response(response.text).strip()
-#                 correct_answers.append(correct_answer)
-#             except Exception as e:
-#                 print(f"Answer generation error: {e}")
-#                 correct_answers.append("Unable to generate answer")
-
-#         return correct_answers
-
-#     def _evaluate_comprehension(self, user_answer: str, correct_answer: str) -> Dict:
-#         """
-#         Evaluate user answer with focus on comprehension and difficulty-based keyword emphasis.
-
-#         :param user_answer: User's provided answer
-#         :param correct_answer: Correct answer
-#         :return: Detailed evaluation dictionary
-#         """
-#         config = self.difficulty_configs[self.difficulty_level]
-
-#         user_lower = user_answer.lower().strip()
-#         correct_lower = correct_answer.lower().strip()
-
-#         # Semantic similarity (for comprehension)
-#         semantic_similarity = difflib.SequenceMatcher(None, user_lower, correct_lower).ratio() * 100
-
-#         # Keyword matching (for precision at higher difficulty)
-#         user_keywords = set(user_lower.split())
-#         correct_keywords = set(correct_lower.split())
-#         keyword_overlap = len(user_keywords & correct_keywords)
-#         total_keywords = len(correct_keywords)
-#         keyword_score = (keyword_overlap / total_keywords * 100) if total_keywords > 0 else 0
-
-#         # Weighted accuracy based on difficulty
-#         accuracy = (
-#             (config['semantic_weight'] * semantic_similarity) +
-#             (config['keyword_weight'] * keyword_score) +
-#             config['partial_match_bonus']
-#         )
-#         accuracy = max(0, min(100, accuracy))
-
-#         # Identify missing keywords for feedback
-#         missing_keywords = list(correct_keywords - user_keywords)
-
-#         return {
-#             'accuracy': round(accuracy, 2),
-#             'semantic_similarity': round(semantic_similarity, 2),
-#             'keyword_score': round(keyword_score, 2),
-#             'missing_keywords': missing_keywords,
-#             'is_correct': accuracy >= self.accuracy_threshold
-#         }
-
-#     def evaluate_answer(self, user_answer: str, correct_answer: str) -> Dict:
-#         """
-#         Evaluate a single user answer with comprehension focus.
-
-#         :param user_answer: User's provided answer
-#         :param correct_answer: Correct answer to the question
-#         :return: Comprehensive evaluation dictionary
-#         """
-#         try:
-#             result = self._evaluate_comprehension(user_answer, correct_answer)
-            
-#             if result['is_correct']:
-#                 self.score += 1
-
-#             return {
-#                 "is_correct": result['is_correct'],
-#                 "accuracy": result['accuracy'],
-#                 "missing_keywords": result['missing_keywords'],
-#                 "correct_answer": correct_answer,
-#                 "user_answer": user_answer,
-#                 "semantic_similarity": result['semantic_similarity'],
-#                 "keyword_score": result['keyword_score']
-#             }
-        
-#         except Exception as e:
-#             print(f"Evaluation error: {e}")
-#             return {
-#                 "is_correct": False,
-#                 "accuracy": 0,
-#                 "missing_keywords": [],
-#                 "correct_answer": correct_answer,
-#                 "user_answer": user_answer,
-#                 "semantic_similarity": 0,
-#                 "keyword_score": 0
-#             }
-
-#     def run_assessment(self, input_text: str, num_questions: int = 5):
-#         """
-#         Run the complete assessment process.
-#         """
-#         questions = self.generate_questions(input_text, num_questions)
-
-#         if not questions:
-#             print("Failed to generate questions.")
-#             return
-
-#         print("\n--- Assessment Questions ---")
-#         for i, question in enumerate(questions, 1):
-#             print(f"Question {i}: {question}")
-
-#         user_answers = []
-#         for i, question in enumerate(questions, 1):
-#             print(f"\nQuestion {i}")
-#             user_answer = input("Your answer: ").strip()
-#             user_answers.append(user_answer)
-
-#         correct_answers = self.generate_correct_answers(input_text, questions)
-
-#         print("\n--- Assessment Results ---")
-#         for i, (user_answer, correct_answer) in enumerate(zip(user_answers, correct_answers), 1):
-#             print(f"\nQuestion {i} Evaluation:")
-#             result = self.evaluate_answer(user_answer, correct_answer)
-
-#             print(f"Status: {'Correct' if result['is_correct'] else 'Incorrect'}")
-#             print(f"Accuracy: {result['accuracy']}%")
-#             print(f"Correct Answer: {result['correct_answer']}")
-#             print(f"Your Answer: {result['user_answer']}")
-#             print(f"Semantic Similarity: {result['semantic_similarity']}%")
-#             print(f"Keyword Match: {result['keyword_score']}%")
-#             if not result['is_correct']:
-#                 print("Missing Keywords:")
-#                 for keyword in result['missing_keywords']:
-#                     print(f"- {keyword}")
-
-#         print(f"\nTotal Score: {self.score}/{len(questions)}")
-#         print(f"Difficulty Level: {self.difficulty_level}")
-
-# def main():
-#     API_KEY = os.getenv('GOOGLE_API_KEY')
-    
-#     input_text = (
-#         """
-# What is Parallel Computer?
-# PAGE 7
-#  A computer which consists of a number of inter-connected computers which
-# cooperatively execute a single program to solve a problem is called a parallel
-# computer.
-#  All current micro-processors are parallel processors.
-#  Each processor in a microprocessor chip is called a core and such a
-# microprocessor is called a multicore processor.
-#  The processor retrieves a sequence of instructions from the main memory and
-# stores them in an on-chip memory. The "cores" can then cooperate to execute
-# these instructions in parallel.
-#  Even though the speed of single processor computers is continuously
-# increasing, problems which are required to be solved nowadays are becoming
-# more complex
-# """
-#     )
-
-#     # Example with different difficulty levels
-#     for difficulty in [1, 2, 3]:
-#         print(f"\nRunning Assessment with Difficulty Level {difficulty}")
-#         assessment = AssessmentSystem(
-#             API_KEY,
-#             accuracy_threshold=70,
-#             difficulty_level=difficulty
-#         )
-#         assessment.run_assessment(input_text, num_questions=2)
-
-# if __name__ == "__main__":
-#     main()
-
-# (By grok)
 import os
 from dotenv import load_dotenv
 load_dotenv()
@@ -382,16 +88,19 @@ class AssessmentSystem:
             print("Error: Input text is empty")
             return []
         
-        prompt = f"""Generate {num_questions} high-quality, specific comprehension questions
-        that directly test the key points of this text. Ensure questions are:
-        - Clear and unambiguous
-        - Directly based on the text's content
-        - Require specific, factual answers
+        prompt = f"""Generate {num_questions} high-quality comprehension questions that fully test the reader's understanding of this text. Ensure questions:
+- Cover all aspects of comprehension, including factual recall, definitions, processes, relationships, comparisons, sequences, purposes, inferences, applications, and critical analysis
+- Are clear, relevant, and directly related to the text's content or concepts
+- Vary in difficulty, from basic recall to higher-order thinking (e.g., analysis, evaluation, application)
+- May include hypothetical scenarios, implications, or connections to broader concepts if relevant to the text
+- Are phrased to engage the reader and encourage deep understanding
+- Use the text’s exact terminology to avoid confusion (e.g., use 'cooperation' if the text does, not 'collaboration')
+- Avoid vague references to unspecified elements (e.g., 'the process' or 'main concepts') unless clearly defined in the question
+- Prefer standalone phrasing, avoiding terms like 'based on the text' to ensure questions are clear without needing the text
 
-        Input Text: {input_text}
+Input Text: {input_text}
 
-        Provide only the questions, without numbering or additional text."""
-
+Provide only the questions, without numbering or additional text."""
         try:
             response = self.client.generate_content(prompt)
             if not response or not response.text:
@@ -427,13 +136,15 @@ class AssessmentSystem:
         """
         correct_answers = []
         for question in questions:
-            prompt = f"""Provide a precise, concise answer to the following question
-            based strictly on the given context:
+            prompt = f"""Provide a precise, concise answer to the following question:
 
-            Context: {input_text}
-            Question: {question}
+Question: {question}
 
-            Answer:"""
+If the provided context does not contain sufficient information to answer the question completely, use general knowledge to provide the correct answer. Do not mention the context, its limitations, or phrases like 'based on general knowledge' in the answer. Simply provide the direct answer to the question.
+
+Context: {input_text}
+
+Answer:"""
 
             try:
                 response = self.client.generate_content(prompt)

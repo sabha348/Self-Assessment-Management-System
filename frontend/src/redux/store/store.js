@@ -13,15 +13,12 @@ import {
 import storage from 'redux-persist/lib/storage';
 
 import authReducer from '../slices/authSlice';
-import userProfileReducer from '../slices/userProfileSlice';
-import questionReducer from '../slices/questionSlice';
-import analyticsReducer from '../slices/analyticsSlice';
 
 const persistConfig = {
   key: 'root',
   version: 1,
   storage,
-  whitelist: ['auth', 'userProfile']
+  whitelist: ['auth']
 };
 
 const persistedAuthReducer = persistReducer(persistConfig, authReducer);
@@ -29,9 +26,6 @@ const persistedAuthReducer = persistReducer(persistConfig, authReducer);
 export const store = configureStore({
   reducer: {
     auth: persistedAuthReducer,
-    userProfile: userProfileReducer,
-    questions: questionReducer,
-    analytics: analyticsReducer
   },
   middleware: (getDefaultMiddleware) => 
     getDefaultMiddleware({

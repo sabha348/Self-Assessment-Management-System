@@ -19,12 +19,12 @@ const UserManagement = () => {
   const [userToDelete, setUserToDelete] = useState(null);
   const [actionSuccess, setActionSuccess] = useState('');
   const { user: currentUser } = useAuth(); // Get current user from AuthContext
-
+  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('http://localhost:8000/api/admin/users', {
+      const response = await axios.get(`${API_URL}/admin/users`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
         params: {
           search,
@@ -70,7 +70,7 @@ if (user._id === currentUser._id) {  // You'll need to track current user
 
   const deleteUser = async () => {
     try {
-      await axios.delete(`http://localhost:8000/api/admin/users/${userToDelete._id}`, {
+      await axios.delete(`${API_URL}/admin/users/${userToDelete._id}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
       

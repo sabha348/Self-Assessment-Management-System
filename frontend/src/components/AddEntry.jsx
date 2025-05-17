@@ -13,6 +13,7 @@ const AddEntry = ({ onEntryAdded }) => {
   const [startTime, setStartTime] = useState(null);
   const [endTime, setEndTime] = useState(null);
   const [error, setError] = useState(""); // New state for error handling
+  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
   // Token state
   const [token, setToken] = useState(localStorage.getItem("token"));
@@ -41,7 +42,7 @@ const AddEntry = ({ onEntryAdded }) => {
 
     try {
       await axios.post(
-        "http://localhost:8000/api/timetable",
+        `${API_URL}/timetable`,
         {
           day,
           subjectName,
