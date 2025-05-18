@@ -9,6 +9,7 @@ import {
 } from '@mui/material';
 import FlagIcon from '@mui/icons-material/Flag';
 
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 // Temporary Timer component until you create one
 const Timer = ({ initialTime, onTimeUp }) => {
   const [timeLeft, setTimeLeft] = useState(initialTime);
@@ -160,7 +161,6 @@ const Assessment = () => {
   const [assessmentComplete, setAssessmentComplete] = useState(false);
   const [results, setResults] = useState(null);
   const [flaggedQuestions, setFlaggedQuestions] = useState({});
-  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
   useEffect(() => {
     // Fetch appropriate questions based on level and item

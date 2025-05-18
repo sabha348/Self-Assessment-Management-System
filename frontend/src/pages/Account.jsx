@@ -5,6 +5,8 @@ import axios from 'axios';
 import { jwtDecode } from 'jwt-decode';
 import { User, Mail, Lock, HelpCircle, Trash2, ArrowLeft, CreditCard } from 'lucide-react';
 
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
+
 const Account = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
@@ -19,7 +21,6 @@ const Account = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [helpMessage, setHelpMessage] = useState('');
   const [showCancelSubscriptionConfirm, setShowCancelSubscriptionConfirm] = useState(false);
-  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
   useEffect(() => {
     const fetchUserData = async () => {

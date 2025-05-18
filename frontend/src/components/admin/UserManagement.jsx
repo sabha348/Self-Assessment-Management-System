@@ -4,6 +4,8 @@ import { Link } from 'react-router-dom';
 import './UserManagement.css';
 import { useAuth } from '../../contexts/AuthContext'; // Add this import
 
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
+
 
 const UserManagement = () => {
   const [users, setUsers] = useState([]);
@@ -19,7 +21,6 @@ const UserManagement = () => {
   const [userToDelete, setUserToDelete] = useState(null);
   const [actionSuccess, setActionSuccess] = useState('');
   const { user: currentUser } = useAuth(); // Get current user from AuthContext
-  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
   const fetchUsers = async () => {
     try {

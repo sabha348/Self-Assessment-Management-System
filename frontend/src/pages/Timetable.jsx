@@ -24,6 +24,9 @@ import { TimePicker, LocalizationProvider } from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import dayjs from "dayjs";
 
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
+
+
 const Timetable = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -39,7 +42,6 @@ const Timetable = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState("");
-  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
    useEffect(() => {
       const fetchUser = async () => {

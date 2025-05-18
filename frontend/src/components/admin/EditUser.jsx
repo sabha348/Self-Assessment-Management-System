@@ -3,6 +3,10 @@ import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import './EditUser.css';
 
+
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
+
+
 const EditUser = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -17,7 +21,6 @@ const EditUser = () => {
   const [success, setSuccess] = useState('');
   const [showResetModal, setShowResetModal] = useState(false);
   const [tempPassword, setTempPassword] = useState('');
-  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
   useEffect(() => {
     const fetchUser = async () => {

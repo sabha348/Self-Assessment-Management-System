@@ -1,9 +1,11 @@
 import axios from 'axios';
 
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
+
+
 export const uploadFile = async (file) => {
   const formData = new FormData();
   formData.append('file', file);
-  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
   // Retrieve token from localStorage
   const token = localStorage.getItem('token');

@@ -16,7 +16,7 @@ router.put('/:id/rename', authenticateToken, async (req, res) => {
     const { newName } = req.body;
     const userId = req.user.userId;
 
-    const file = await Document.findById(id, { uploadedBy: userId });
+    const file = await Document.findById({id, uploadedBy: userId});
 
     if (!file) {
       return res.status(404).json({ error: 'File not found' });
@@ -44,7 +44,7 @@ router.put('/:id/move', authenticateToken, async (req, res) => {
     const { folderId } = req.body;
     const userId  = req.user.userId;
 
-    const file = await Document.findById(id, { uploadedBy: userId });
+    const file = await Document.findById({id, uploadedBy: userId});
 
     if (!file) {
       return res.status(404).json({ error: 'File not found' });

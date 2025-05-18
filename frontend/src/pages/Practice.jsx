@@ -71,6 +71,8 @@ import { styled } from '@mui/material/styles';
 import { useNavigate } from 'react-router-dom';
 import Joyride from 'react-joyride';
 
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
+
 // Styled components with improved animations and layout
 const ContentWrapper = styled(Box)(({ theme }) => ({
   background: 'linear-gradient(145deg, #f5f7fa 0%, #e4e9f2 100%)',
@@ -378,7 +380,6 @@ const Practice = () => {
   });
   
   const navigate = useNavigate();
-  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
   // Check if user has seen this tour before
   useEffect(() => {
@@ -1497,7 +1498,7 @@ const AssessmentConfigModal = ({ open, handleClose, item, level, navigate }) => 
   // Keep the existing state and handlers
   const [config, setConfig] = useState({
     numQuestions: 5,
-    difficulty: 'Medium',
+    difficulty: 'medium',
     timeLimit: 0, // 0 = no limit
     questionTypes: ['open-ended'],
     includeSubtopics: true,

@@ -52,6 +52,8 @@ import EditIcon from "@mui/icons-material/Edit";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import DriveFileMoveIcon from "@mui/icons-material/DriveFileMove";
 
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
+
 const FilesList = () => {
   const location = useLocation();
   const fileInputRef = useRef(null);
@@ -84,7 +86,6 @@ const FilesList = () => {
       disableBeacon: true,
     }
   ]);
-  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:8000/api";
 
    // Check if user has seen this tour before
   useEffect(() => {

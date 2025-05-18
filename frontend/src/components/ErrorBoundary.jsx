@@ -7,9 +7,9 @@ constructor(props) {
   this.state = { hasError: false, error: null };
 }
 
-static getDerivedStateFromError(error) {
-  return { hasError: true, error };
-}
+// static getDerivedStateFromError(error) {
+//   return { hasError: true, error };
+// }
 
 componentDidMount() {
   // Catch module loading errors
@@ -25,11 +25,11 @@ componentDidMount() {
 }
 
 
-  componentDidCatch(error, info) {
-    console.error('Component Error:', error, info);
-    // Report error to backend to notify admins
-    reportError(error, this.props.componentName);
-  }
+  // componentDidCatch(error, info) {
+  //   console.error('Component Error:', error, info);
+  //   // Report error to backend to notify admins
+  //   reportError(error, this.props.componentName);
+  // }
 
   render() {
     if (this.state.hasError) {

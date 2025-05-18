@@ -40,12 +40,14 @@ import axios from "axios";
 import InfoIcon from "@mui/icons-material/Info";
 import Joyride from "react-joyride";
 
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
+
+
 
 const SkillAnalysis = () => {
   const navigate = useNavigate(); 
   // Tab state
   const [activeTab, setActiveTab] = useState(0);
-  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
   // Hierarchy navigation state
   const [currentLevel, setCurrentLevel] = useState("subject");

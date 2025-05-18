@@ -1,10 +1,11 @@
 import axios from 'axios';
 
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
+
 export const reportError = async (error, componentName = 'Unknown') => {
   try {
     const token = localStorage.getItem('token');
     const user = JSON.parse(localStorage.getItem('user')) || {};
-    const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
     
     // Ensure we have these fields for error reporting
     const payload = {

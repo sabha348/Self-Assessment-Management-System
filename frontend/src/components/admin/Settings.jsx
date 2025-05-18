@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import './Settings.css';
 
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
+
 const Settings = () => {
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -11,7 +13,6 @@ const Settings = () => {
   const [faviconPreview, setFaviconPreview] = useState(null);
   const [uploadingFavicon, setUploadingFavicon] = useState(false);
   const fileInputRef = useRef(null);
-  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
   
   useEffect(() => {
     const fetchSettings = async () => {

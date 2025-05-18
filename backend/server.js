@@ -31,7 +31,7 @@ connectDB();
 
 // Middleware
 app.use(cors({
-  origin: process.env.FRONTEND_URL || "http://localhost:3000",
+  origin: "http://localhost:3000",
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
   allowedHeaders: ["Content-Type", "Authorization"]
 }));
@@ -66,7 +66,7 @@ app.use('/api/admin', adminRoutes);
 
 // app.use('/api/membership/upgrade',upgradeMembership);
 app.use('/api/analytics', userAnalyticsRouter); // Add this line with your other app.use statements
-app.use('/api/errors', errorRoutes); // Add this with your other routes
+// app.use('/api/errors', errorRoutes); // Add this with your other routes
 
 
 // Test route
@@ -75,18 +75,18 @@ app.get('/api/test', (req, res) => {
 });
 
 // Error handling middleware
-app.use((err, req, res, next) => {
-  console.error('Server error:', err);
+// app.use((err, req, res, next) => {
+//   console.error('Server error:', err);
   
-  // Send a formatted error response
-  res.status(err.status || 500).json({
-    error: err.message || 'An unexpected error occurred',
-    details: process.env.NODE_ENV === 'development' ? err.stack : undefined
-  });
-});
+//   // Send a formatted error response
+//   res.status(err.status || 500).json({
+//     error: err.message || 'An unexpected error occurred',
+//     details: process.env.NODE_ENV === 'development' ? err.stack : undefined
+//   });
+// });
 
 // Add this after all your app.use() routes but before app.listen()
-app.use(errorHandler);
+// app.use(errorHandler);
 
 app.listen(port, () => {
   console.log(`Assessment server running on port ${port}`);

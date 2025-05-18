@@ -4,6 +4,8 @@ import { toast } from 'react-toastify';
 import { Bell, Mail, Trash, User, CheckCircle, X, AlertTriangle } from 'lucide-react';
 import './NotificationsPanel.css';
 
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
+
 const NotificationsPanel = () => {
   const [notifications, setNotifications] = useState([]);
   const [helpRequests, setHelpRequests] = useState([]);
@@ -12,7 +14,6 @@ const NotificationsPanel = () => {
   const [responseText, setResponseText] = useState('');
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [showResponseModal, setShowResponseModal] = useState(false);
-  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
   useEffect(() => {
     fetchNotificationsAndRequests();

@@ -2,13 +2,14 @@ import { useEffect, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
+
 const PaymentSuccess = () => {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const sessionId = searchParams.get("session_id");
     const [message, setMessage] = useState("");
     const [status, setStatus] = useState("processing");
-    const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
     useEffect(() => {
         if (sessionId) {

@@ -10,6 +10,8 @@ import axios from 'axios';
 import { jwtDecode } from "jwt-decode";
 import Joyride from 'react-joyride';
 
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
+
 const Dashboard = () => {
   const { updateUser } = useAuth();
   const location = useLocation();
@@ -21,7 +23,6 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
-  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
   
   // Add Joyride tour state
   const [runTour, setRunTour] = useState(false);

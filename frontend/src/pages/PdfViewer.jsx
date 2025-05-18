@@ -13,6 +13,8 @@ import '@react-pdf-viewer/core/lib/styles/index.css';
 import '@react-pdf-viewer/default-layout/lib/styles/index.css';
 import '@react-pdf-viewer/thumbnail/lib/styles/index.css';
 
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
+
 const PdfViewer = () => {
   const location = useLocation();
   const token = localStorage.getItem('token');
@@ -66,7 +68,6 @@ const PdfViewer = () => {
 
   const defaultLayoutPluginInstance = defaultLayoutPlugin();
   const thumbnailPluginInstance = thumbnailPlugin();
-  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
   // Joyride tour state
   const [runTour, setRunTour] = useState(false);
@@ -159,11 +160,20 @@ const PdfViewer = () => {
       }
     };
 
-    const handleClick = (e) => {
-      // If clicking outside the selection, hide the button
+     const handleClick = (e) => {
+      // Check if clicked on the generate button itself
+      const isClickingGenerateButton = e.target.closest('.generate-button');
+      
+      // Check if we just made a selection (this is the critical fix)
       const selection = window.getSelection();
-      if (!selection.toString().trim()) {
-        setShowButton(false);
+      const hasSelection = selection && selection.toString().trim().length > 0;
+      
+      // Only clear selection and hide button if:
+      // 1. Not clicking on generate button AND
+      // 2. There's no fresh selection OR we're clicking far from the selection
+      if (!isClickingGenerateButton && !hasSelection) {
+        selection.removeAllRanges(); // Clear the selection
+        setShowButton(false); // Hide the button
       }
     };
 
@@ -216,6 +226,9 @@ const PdfViewer = () => {
   const handleProcessText = async () => {
     try {
       // Clear the autoSubmission timer when manually generating questions
+       // Hide the button immediately after click
+      setShowButton(false);
+
       if (autoSubmissionTimer) {
         clearInterval(autoSubmissionTimer);
         setAutoSubmissionTimer(null);
@@ -1271,7 +1284,7 @@ useEffect(() => {
         {/* Floating Button */}
         {showButton && (
           <button
-            className="fixed z-20 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg transform -translate-x-1/2"
+            className="fixed z-20 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg transform -translate-x-1/2 generate-button"
             style={{
               left: buttonPosition.x,
               top: buttonPosition.y,

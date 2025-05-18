@@ -41,7 +41,7 @@ router.put('/:id/rename', authenticateToken, async (req, res) => {
     const { newName } = req.body;
     const userId = req.user.userId;
     
-    const folder = await Folder.findById(id, { createdBy: userId });
+    const folder = await Folder.findById({id,  createdBy: userId });
     
     if (!folder) {
       return res.status(404).json({ error: 'Folder not found' });
@@ -68,7 +68,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
     const userId = req.user.userId;
 
-    const folder = await Folder.findById(id, { createdBy: userId });
+    const folder = await Folder.findById({id,  createdBy: userId });
 
     if (!folder) {
       return res.status(404).json({ error: 'Folder not found' });
@@ -83,7 +83,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
     await Document.deleteMany({ folderId: id, uploadedBy: userId });
     
     // Delete the folder itself
-    await Folder.findByIdAndDelete(id, { createdBy: userId });
+    await Folder.findByIdAndDelete({id,  createdBy: userId });
     
     res.status(200).json({ message: 'Folder and contents deleted successfully' });
   } catch (error) {

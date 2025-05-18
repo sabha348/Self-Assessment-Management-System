@@ -1519,10 +1519,13 @@ router.get("/derived-score-details", authenticateToken, async (req, res) => {
     }
 
     // Step 1: Get all questions for this item
-    const questionQuery = {};
-    questionQuery[level] = itemName;
+      const questionQuery = {
+      [level]: itemName,
+      userId: userId // Add userId to the query
+    };
 
-    const itemQuestions = await Question.find(questionQuery, { userId: userId }).select(
+
+    const itemQuestions = await Question.find(questionQuery).select(
       "questionId subject topic subtopic concept"
     );
     const questionIds = itemQuestions.map((q) => q.questionId);

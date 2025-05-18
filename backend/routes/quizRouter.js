@@ -81,33 +81,29 @@ router.post("/", async (req, res) => {
         })
         .filter((q) => q.length > 0); // Remove any empty questions
 
-      // Categorize the text content
-      console.log("Categorizing text content...");
-      const categories = await categorizeText(cleanText);
-
-      // Update the quiz with category information
-      await Quiz.findByIdAndUpdate(quizId, {
-        subject: categories.Subject,
-        topic: categories.Topic,
-        subtopic: categories.Subtopic,
-        concept: categories.Concept,
-      });
-
-      console.log("questionsinitial:", questionsArray);
-
       // Include categories in the response
       res.json({
         quizId,
         questions: questionsArray,
-        categories: categories,
       });
 
-      // After sending response, continue with background processing
-      console.log("Generating correct answers in the background...");
-
-      // Background processing wrapped in its own try/catch
       try {
+        // Move categorization to background processing
+        console.log("Categorizing text content...");
+        const categories = await categorizeText(cleanText);
+
+        // Update the quiz with category information
+        await Quiz.findByIdAndUpdate(quizId, {
+          subject: categories.Subject,
+          topic: categories.Topic,
+          subtopic: categories.Subtopic,
+          concept: categories.Concept,
+        });
+        
+        console.log("Text categorized and quiz updated successfully.");
+
         // Generate correct answers with cleaned data
+        console.log("Generating correct answers in the background...");  // Generate correct answers with cleaned data
         const correctAnswers = await runPythonProcess(
           "./python_scripts/correct_answers.py",
           [
@@ -351,9 +347,8 @@ router.post("/:quizId/submit", async (req, res) => {
           // Update the questions in the database with the newly generated answers
           const updatePromises = questionsWithoutAnswers.map(
             (question, idx) => {
-              return Question.findByIdAndUpdate(question._id, {
+              return Question.findByIdAndUpdate({ _id: question._id, userId: userId }, {
                 correctAnswer: correctAnswers[idx] || "No answer available",
-                userId: userId,
               });
             }
           );

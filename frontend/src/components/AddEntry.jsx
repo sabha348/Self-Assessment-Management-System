@@ -6,6 +6,9 @@ import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import dayjs from "dayjs";
 import { useNavigate } from "react-router-dom";
 
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
+
+
 const AddEntry = ({ onEntryAdded }) => {
   const navigate = useNavigate();
   const [day, setDay] = useState("");
@@ -13,7 +16,6 @@ const AddEntry = ({ onEntryAdded }) => {
   const [startTime, setStartTime] = useState(null);
   const [endTime, setEndTime] = useState(null);
   const [error, setError] = useState(""); // New state for error handling
-  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
   // Token state
   const [token, setToken] = useState(localStorage.getItem("token"));

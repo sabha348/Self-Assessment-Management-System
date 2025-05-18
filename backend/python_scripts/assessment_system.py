@@ -88,16 +88,18 @@ class AssessmentSystem:
             print("Error: Input text is empty")
             return []
         
-        prompt = f"""Generate {num_questions} high-quality comprehension questions that fully test the reader's understanding of this text. Ensure questions:
+        prompt = f"""Generate {num_questions} high-quality comprehension questions that fully test the reader's understanding of the concepts related to the input text. Ensure questions:
+
 - Cover all aspects of comprehension, including factual recall, definitions, processes, relationships, comparisons, sequences, purposes, inferences, applications, and critical analysis
-- Are clear, relevant, and directly related to the text's content or concepts
+- Are clear, relevant, and directly related to the concepts or content described in the text
 - Vary in difficulty, from basic recall to higher-order thinking (e.g., analysis, evaluation, application)
-- May include hypothetical scenarios, implications, or connections to broader concepts if relevant to the text
+- May include hypothetical scenarios, implications, or connections to broader concepts if relevant to the text's subject matter
 - Are phrased to engage the reader and encourage deep understanding
 - Use the text’s exact terminology to avoid confusion (e.g., use 'cooperation' if the text does, not 'collaboration')
 - Avoid vague references to unspecified elements (e.g., 'the process' or 'main concepts') unless clearly defined in the question
-- Prefer standalone phrasing, avoiding terms like 'based on the text' to ensure questions are clear without needing the text
-
+- Are fully standalone, meaning they can be answered by someone with relevant knowledge without access to the input text
+- Avoid phrases like 'based on the text,' 'in the provided text,' or references to specific examples (e.g., 'the provided Express example') unless the example or context is explicitly described within the question itself
+- When referring to specific examples (e.g., a code snippet, scenario, or tool), include a brief, clear description of that example within the question to ensure it is self-contained
 Input Text: {input_text}
 
 Provide only the questions, without numbering or additional text."""

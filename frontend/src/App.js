@@ -80,7 +80,7 @@ const AuthGuard = ({ children }) => {
 
 function App() {
   return (
-    <ErrorBoundary componentName="AppRoot">
+    // <ErrorBoundary componentName="AppRoot">
       <Provider store={store}>
         <PersistGate loading={null} persistor={persistor}>
           <ThemeProvider theme={theme}>
@@ -169,7 +169,7 @@ function App() {
           </ThemeProvider>
         </PersistGate>
       </Provider>
-    </ErrorBoundary>
+    // </ErrorBoundary>
   );
 }
 
