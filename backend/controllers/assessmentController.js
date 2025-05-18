@@ -979,7 +979,7 @@ const deleteQuestion = async (req, res) => {
       );
 
       // If quiz has no questions left, delete it
-      const remainingQuestions = await Question.countDocuments({ quizeRef });
+      const remainingQuestions = await Question.countDocuments({ quizeRef : quizRef });
       if (remainingQuestions === 0) {
         await Quiz.deleteOne({ _id: quizRef }, { session });
       }
