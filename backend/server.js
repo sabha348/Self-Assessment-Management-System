@@ -31,7 +31,9 @@ connectDB();
 
 // Middleware
 app.use(cors({
-  origin: "http://localhost:3000",
+  origin: process.env.ALLOWED_ORIGINS ? 
+    process.env.ALLOWED_ORIGINS.split(',') : 
+    ["http://localhost:3000", "https://sams-frontend-blush.vercel.app"],
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
   allowedHeaders: ["Content-Type", "Authorization"]
 }));
