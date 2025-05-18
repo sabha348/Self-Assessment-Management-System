@@ -61,7 +61,7 @@ const getFiles = async (req, res) => {
 const getFileById = async (req, res) => {
   const userId = req.user.userId;
   try {
-    const file = await Document.findById({ _id: req.params.id, uploadedBy: userId });
+    const file = await Document.findById(req.params.id);
     if (!file) {
       return res.status(404).json({ error: 'File not found' });
     }
@@ -83,7 +83,8 @@ const deleteFile = async (req, res) => {
     const userId = req.user.userId;
 
     
-    const file = await Document.findById({id,uploadedBy: userId });
+    const file = await Document.findById(id);
+
     
     if (!file) {
       return res.status(404).json({ error: 'File not found' });
@@ -94,7 +95,7 @@ const deleteFile = async (req, res) => {
       return res.status(403).json({ error: 'Not authorized to delete this file' });
     }
     
-    await Document.findByIdAndDelete({id,  uploadedBy: userId });
+    await Document.findByIdAndDelete(id);
     res.status(200).json({ message: 'File deleted successfully' });
   } catch (error) {
     console.error('Delete error:', error);
