@@ -88,18 +88,16 @@ class AssessmentSystem:
             print("Error: Input text is empty")
             return []
         
-        prompt = f"""Generate {num_questions} high-quality comprehension questions that fully test the reader's understanding of the concepts related to the input text. Ensure questions:
+        prompt = f"""Generate {num_questions} high-quality comprehension questions that test the reader's understanding of concepts related to the subject matter of the input text (e.g., SQL databases, programming). Ensure questions:
 
-- Cover all aspects of comprehension, including factual recall, definitions, processes, relationships, comparisons, sequences, purposes, inferences, applications, and critical analysis
-- Are clear, relevant, and directly related to the concepts or content described in the text
-- Vary in difficulty, from basic recall to higher-order thinking (e.g., analysis, evaluation, application)
-- May include hypothetical scenarios, implications, or connections to broader concepts if relevant to the text's subject matter
-- Are phrased to engage the reader and encourage deep understanding
-- Use the text’s exact terminology to avoid confusion (e.g., use 'cooperation' if the text does, not 'collaboration')
-- Avoid vague references to unspecified elements (e.g., 'the process' or 'main concepts') unless clearly defined in the question
-- Are fully standalone, meaning they can be answered by someone with relevant knowledge without access to the input text
-- Avoid phrases like 'based on the text,' 'in the provided text,' or references to specific examples (e.g., 'the provided Express example') unless the example or context is explicitly described within the question itself
-- When referring to specific examples (e.g., a code snippet, scenario, or tool), include a brief, clear description of that example within the question to ensure it is self-contained
+Cover all aspects of comprehension, including factual recall, definitions, processes, relationships, comparisons, sequences, purposes, inferences, applications, and critical analysis
+Are clear, relevant, and engaging, encouraging deep understanding of the subject matter
+Vary in difficulty, from basic recall to higher-order thinking (e.g., analysis, evaluation, application), requiring readers to draw on existing knowledge of the subject matter
+May include hypothetical scenarios, implications, or connections to broader concepts relevant to the subject matter
+Use precise terminology consistent with the subject matter (e.g., use 'query' for SQL, not 'request')
+Avoid vague references to unspecified elements (e.g., 'the process' or 'main concepts') unless clearly defined in the question
+Are fully standalone, meaning they can be answered by someone with relevant knowledge without any reference to or implication of an input text; never use phrases like 'based on the text,' 'concepts from the text,' or 'the provided SQL command,' and embed all necessary context (e.g., table structures, code snippets, scenarios) naturally within the question as if designed independently
+Incorporate specific details from the input text (e.g., table names like Client_Master) naturally, or generate plausible, clear, and concise context consistent with the subject matter if the text lacks details, ensuring questions are self-contained and answerable without suggesting derivation from a text
 Input Text: {input_text}
 
 Provide only the questions, without numbering or additional text."""

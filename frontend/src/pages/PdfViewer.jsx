@@ -73,6 +73,9 @@ const PdfViewer = () => {
   timeLimit: 0
 });
 
+// Add this state variable with your other states
+const [isProcessingResults, setIsProcessingResults] = useState(false);
+
   const defaultLayoutPluginInstance = defaultLayoutPlugin();
   const thumbnailPluginInstance = thumbnailPlugin();
 
@@ -104,6 +107,7 @@ const PdfViewer = () => {
       placement: 'center'
     }
   ]);
+
 
 
   useEffect(() => {
@@ -493,11 +497,14 @@ const handleAutoSubmission = useCallback(async () => {
 
 
   // Resume timer when questions are closed
-  const handleCloseQuestions = () => {
+const handleCloseQuestions = () => {
   clearQuizTimer();
   setShowQuestions(false);
-  setIsTimerPaused(false);  // Resume timer
   
+  // Only unpause if we're not processing results
+  if (!isProcessingResults) {
+    setIsTimerPaused(false);
+  }
 };
 
   // Clear timer function
@@ -587,15 +594,9 @@ const handleSubmitAnswers = useCallback(async (isTimeUp = false, explicitQuizId 
   
   console.log('Submitting answers with:', { quizId: submissionQuizId, userId, isTimeUp, remainingTime });
   
-  if (!submissionQuizId) {
-    console.error('Missing quiz ID');
-    toast.error("Missing quiz ID. Please try again.");
-    return;
-  }
-  
-  if (!userId) {
-    console.error('Missing user ID');
-    toast.error("Missing user ID. Please try again.");
+  if (!submissionQuizId || !userId) {
+    console.error('Missing quiz ID or user ID');
+    toast.error("Missing information. Please try again.");
     return;
   }
 
@@ -610,9 +611,12 @@ const handleSubmitAnswers = useCallback(async (isTimeUp = false, explicitQuizId 
     }
   }
 
-  // Only show "Time's up" if isTimeUp is true AND remainingTime is actually at or near zero
+  // ⭐ Close questions immediately, but keep timer paused
+  setShowQuestions(false);
+  setIsProcessingResults(true); // Mark that we're processing
+  
   const showTimeUpMessage = isTimeUp && (!remainingTime);
-  const toastId = toast.loading(showTimeUpMessage ? "Time's up! Submitting answers..." : "Submitting answers...");
+  const toastId = toast.loading(showTimeUpMessage ? "Time's up! Processing answers..." : "Processing answers...");
 
   try {
     // Clear the quiz timer
@@ -640,32 +644,27 @@ const handleSubmitAnswers = useCallback(async (isTimeUp = false, explicitQuizId 
     
     // Add score to recent scores
     setRecentScores(prev => {
-      const newScores = [
-        ...prev, 
-        { 
-          percentage: scorePercentage, 
-          timestamp: Date.now(),
-          quizId: quizId
-        }
-      ];
-      
-      // Keep only the last 10 scores for memory efficiency
+      const newScores = [...prev, { 
+        percentage: scorePercentage, 
+        timestamp: Date.now(),
+        quizId: quizId
+      }];
       return newScores.slice(-10);
     });
     
     setEvaluationResults(response.data);
-    setShowQuestions(false);
     setShowResults(true);
-    
-    // After processing the score, check if a break notification is needed
     checkForBreakNotification();
     
   } catch (error) {
     toast.dismiss(toastId);
     console.error('Error submitting answers:', error);
     toast.error('Failed to submit answers. Please try again.');
+    setIsTimerPaused(false); // In error case, resume timer
+  } finally {
+    setIsProcessingResults(false); // Always clear the processing flag
   }
-}, [quizId, userId, questions, answers, startTime, clearQuizTimer, checkForBreakNotification, remainingTime, quizTimerInterval]);
+}, [quizId, userId, questions, answers, startTime, clearQuizTimer, checkForBreakNotification, remainingTime]);
 
   // Resume timer when results are closed
   const handleCloseResults = () => {
@@ -764,7 +763,7 @@ useEffect(() => {
   }
   
   return undefined; // Empty cleanup when no timer is created
-}, [isTimerPaused, showQuestions, showResults, handleAutoSubmission]); // Add showQuestions and showResults
+}, [isTimerPaused, showQuestions, showResults,isProcessingResults, handleAutoSubmission]); // Add showQuestions and showResults
 
 // Format remaining time as mm:ss
 const formatTime = (ms) => {
@@ -802,6 +801,9 @@ const startQuizTimer = useCallback((timeLimit, explicitQuizId) => {
       clearInterval(timerInterval);
       setRemainingTime(0);
       
+      // Close questions immediately but keep timer paused
+  setShowQuestions(false);
+  setIsProcessingResults(true);
       // Use a completely different approach - direct submission with current quiz ID
       console.log('Timer expired, submitting with quizId:', currentQuizId);
       
@@ -856,11 +858,13 @@ const startQuizTimer = useCallback((timeLimit, explicitQuizId) => {
         
         // After processing the score, check if a break notification is needed
         checkForBreakNotification();
+        setIsProcessingResults(false);
       })
       .catch(error => {
         toast.dismiss(toastId);
         console.error('Error submitting answers:', error);
         toast.error('Failed to submit answers. Please try again.');
+        setIsProcessingResults(false);
       });
     }
   }, 1000);

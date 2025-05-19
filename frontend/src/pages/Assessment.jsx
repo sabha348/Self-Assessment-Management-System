@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { jwtDecode } from 'jwt-decode';
+import { toast, Toaster } from 'react-hot-toast'; // Add this import
 import {
   Container, Box, Paper, Typography, Button, LinearProgress,
   Radio, RadioGroup, FormControlLabel, FormControl, TextField,
-  Divider, Card, CardContent, Chip, Alert, CircularProgress, IconButton // Added CircularProgress
+  Divider, Card, CardContent, Chip, Alert, CircularProgress, IconButton
 } from '@mui/material';
 import FlagIcon from '@mui/icons-material/Flag';
 
@@ -16,6 +17,7 @@ const Timer = ({ initialTime, onTimeUp }) => {
   
   useEffect(() => {
     if (timeLeft <= 0) {
+      toast.error("Time's up! Submitting your assessment...");
       onTimeUp();
       return;
     }
@@ -226,6 +228,10 @@ const Assessment = () => {
   const handleSubmit = async () => {
     try {
       setIsSubmitting(true);
+
+      // Show submission toast
+    const submissionToast = toast.loading('Submitting your assessment...');
+    
       
       // Prepare answers for submission - include ALL questions
       const formattedAnswers = {};
@@ -263,6 +269,9 @@ const Assessment = () => {
         includeUnanswered: true 
       }, { headers });
       
+    toast.dismiss(submissionToast);
+    toast.success('Assessment submitted successfully!');
+    
       // Process response...
       setResults({
         score: (response.data.totalScore / questions.length) * 100,
@@ -296,9 +305,12 @@ const Assessment = () => {
       }, { headers });
     } catch (error) {
       console.error("Failed to save assessment results:", error);
+      toast.error("Failed to save your results, but assessment was completed.");
+
     }
   } catch (error) {
     console.error("Error submitting assessment:", error);
+    toast.error("Failed to save your results, but assessment was completed.");
     setError("Failed to submit your assessment. Please try again.");
   } finally {
     setIsSubmitting(false);
@@ -328,6 +340,23 @@ const Assessment = () => {
   
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
+    {/* Toaster component */}
+    <Toaster 
+      position="top-right"
+      toastOptions={{
+        success: {
+          duration: 3000,
+          style: { background: 'green', color: 'white' },
+        },
+        error: {
+          duration: 4000,
+          style: { background: '#FF4B4B', color: 'white' },
+        },
+        loading: {
+          duration: Infinity,
+        },
+      }}
+    />
       {/* Assessment header - conditionally render parts based on assessment status */}
       <Box sx={{ mb: 4 }}>
         <Typography variant="h4" gutterBottom>
