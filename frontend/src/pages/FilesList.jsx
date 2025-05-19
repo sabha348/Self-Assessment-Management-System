@@ -220,27 +220,43 @@ const FilesList = () => {
   }, [questionConfig]);
 
   const openFile = async (fileId) => {
-    try {
-      const response = await axios.get(
-        `${API_URL}/files/${fileId}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+  try {
+    
+    const response = await axios.get(
+      `${API_URL}/files/${fileId}`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: 'blob',
+      }
+    );
 
-      navigate("/pdf-viewer", {
-        state: {
-          pdfData: `data:application/pdf;base64,${response.data.content}`,
-          title: response.data.title,
-          // Pass question configuration settings
-          questionConfig: questionConfig,
-        },
-      });
-    } catch (error) {
-      console.error("Error opening file:", error);
-      toast.error("Failed to open file");
+    // Create blob URL
+    const blob = new Blob([response.data], { type: 'application/pdf' });
+    const pdfUrl = URL.createObjectURL(blob);
+    
+    // Improved header parsing
+    let title = `Document_${fileId.substring(0, 8)}`;
+    const contentDisposition = response.headers['content-disposition'];
+
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename="([^"]+)"/);
+      if (filenameMatch && filenameMatch[1]) {
+        title = decodeURIComponent(filenameMatch[1]);
+      }
     }
-  };
+
+    navigate("/pdf-viewer", {
+      state: {
+        pdfData: pdfUrl,
+        title: title,
+        questionConfig: questionConfig,
+      },
+    });
+  } catch (error) {
+    console.error("Error opening file:", error);
+    toast.error("Failed to open file");
+  }
+};
 
   const deleteFile = async (id) => {
     // ... existing deleteFile code ...

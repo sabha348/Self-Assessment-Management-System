@@ -90,7 +90,7 @@ router.post("/", async (req, res) => {
       try {
         // Move categorization to background processing
         console.log("Categorizing text content...");
-        const categories = await categorizeText(cleanText);
+        const categories = await categorizeText(cleanText, userId);
 
         // Update the quiz with category information
         await Quiz.findByIdAndUpdate(quizId, {
@@ -99,11 +99,11 @@ router.post("/", async (req, res) => {
           subtopic: categories.Subtopic,
           concept: categories.Concept,
         });
-        
+
         console.log("Text categorized and quiz updated successfully.");
 
         // Generate correct answers with cleaned data
-        console.log("Generating correct answers in the background...");  // Generate correct answers with cleaned data
+        console.log("Generating correct answers in the background..."); // Generate correct answers with cleaned data
         const correctAnswers = await runPythonProcess(
           "./python_scripts/correct_answers.py",
           [
@@ -303,7 +303,10 @@ router.post("/:quizId/submit", async (req, res) => {
     }
 
     // Fetch questions for the quiz and sort by position
-    const questions = await Question.find({ quizeRef: quizId, userId: userId }).sort({
+    const questions = await Question.find({
+      quizeRef: quizId,
+      userId: userId,
+    }).sort({
       position: 1,
     }); // Sort by position in ascending order
 
@@ -347,9 +350,12 @@ router.post("/:quizId/submit", async (req, res) => {
           // Update the questions in the database with the newly generated answers
           const updatePromises = questionsWithoutAnswers.map(
             (question, idx) => {
-              return Question.findByIdAndUpdate({ _id: question._id, userId: userId }, {
-                correctAnswer: correctAnswers[idx] || "No answer available",
-              });
+              return Question.findByIdAndUpdate(
+                { _id: question._id, userId: userId },
+                {
+                  correctAnswer: correctAnswers[idx] || "No answer available",
+                }
+              );
             }
           );
 
@@ -444,12 +450,8 @@ router.post("/:quizId/submit", async (req, res) => {
         accuracy: evaluation.accuracy,
         user_answer: evaluation.user_answer,
         correct_answer: evaluation.correct_answer,
-        ...(evaluation.is_correct
-          ? {}
-          : {
-              question: questionsData[index],
-              missing_points: evaluation.missing_points || [],
-            }),
+        question: questionsData[index],
+        missing_points: evaluation.missing_points || [],
       }));
 
       res.json({
@@ -484,7 +486,10 @@ router.get("/:quizId/results/:userId", async (req, res) => {
     }
 
     // Get all questions for this quiz in the correct order
-    const questions = await Question.find({ quizeRef: quizId, userId: userId }).sort({
+    const questions = await Question.find({
+      quizeRef: quizId,
+      userId: userId,
+    }).sort({
       position: 1,
     });
 

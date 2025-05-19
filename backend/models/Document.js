@@ -1,18 +1,13 @@
 const mongoose = require('mongoose');
 
-const documentSchema = new mongoose.Schema({
+const DocumentSchema = new mongoose.Schema({
   title: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  content: {
     type: String,
     required: true
   },
   fileType: {
     type: String,
-    default: 'PDF'
+    required: true
   },
   uploadedBy: {
     type: mongoose.Schema.Types.ObjectId,
@@ -23,7 +18,21 @@ const documentSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Folder',
     default: null
+  },
+  // Make content optional since we're using GridFS for storage
+  content: {
+    type: String,
+    required: false // Change from true to false
+  },
+  // Add GridFS ID field
+  gridFSId: {
+    type: mongoose.Schema.Types.ObjectId,
+    required: false
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
   }
-}, { timestamps: true });
+});
 
-module.exports = mongoose.model('Document', documentSchema);
+module.exports = mongoose.model('Document', DocumentSchema);

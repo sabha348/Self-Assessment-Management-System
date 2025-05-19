@@ -1,4 +1,5 @@
 require('dotenv').config();
+const CategoryStandardizer = require('./CategoryStandardizer');
 
 // Default result structure
 const DEFAULT_RESULT = {
@@ -20,7 +21,7 @@ const COMMON_SUBJECTS = [
 const API_KEY = process.env.GOOGLE_API_KEY;
 const API_ENDPOINT = process.env.GOOGLE_AI_ENDPOINT || "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash";
 
-async function categorizeText(text) {
+async function categorizeText(text, userId) {
   // Check if text is provided and API key is available
   if (!text || text.trim() === "") {
     console.warn("Empty text provided for categorization");
@@ -92,9 +93,25 @@ async function categorizeText(text) {
     const resultText = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || 
       "Subject: Unknown\nTopic: Unknown\nSubtopic: Unknown\nConcept: Unknown";
     
-    return parseResponse(resultText);
+    // Parse the response
+    const parsedResponse = parseResponse(resultText);
+    
+    // Standardize each category against the database if userId is provided
+    if (userId) {
+      for (const category of ['Subject', 'Topic', 'Subtopic', 'Concept']) {
+        if (parsedResponse[category] !== 'Unknown') {
+          parsedResponse[category] = await CategoryStandardizer.standardizeTerm(
+            parsedResponse[category], 
+            category, 
+            userId
+          );
+        }
+      }
+    }
+    
+    return parsedResponse;
   } catch (error) {
-    console.error(`Categorization API Error: ${error.message}`);
+    console.error(`Categorization Error: ${error.message}`);
     return DEFAULT_RESULT;
   }
 }

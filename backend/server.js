@@ -35,7 +35,10 @@ app.use(cors({
     process.env.ALLOWED_ORIGINS.split(',') : 
     ["http://localhost:3000", "https://sams-frontend-blush.vercel.app"],
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-  allowedHeaders: ["Content-Type", "Authorization"]
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true,
+
+  exposedHeaders: ["Content-Disposition"],
 }));
 
 // Add this line before your routes

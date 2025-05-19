@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { toast, Toaster } from 'react-hot-toast';
@@ -66,6 +66,13 @@ const PdfViewer = () => {
     return saved ? parseInt(saved, 10) : Date.now();
   });
 
+  const [questionConfig, setQuestionConfig] = useState({
+  numQuestions: 5,
+  difficulty: 'medium',
+  questionTypes: ['open-ended'],
+  timeLimit: 0
+});
+
   const defaultLayoutPluginInstance = defaultLayoutPlugin();
   const thumbnailPluginInstance = thumbnailPlugin();
 
@@ -98,6 +105,14 @@ const PdfViewer = () => {
     }
   ]);
 
+
+  useEffect(() => {
+  // If location.state has question config, use it to initialize our state
+  if (location.state?.questionConfig) {
+    setQuestionConfig(location.state.questionConfig);
+  }
+}, [location.state]);
+
   // Check if user has seen this tour before
   useEffect(() => {
     if (userId) {
@@ -124,6 +139,7 @@ const PdfViewer = () => {
       }
     }
   };
+
 
   useEffect(() => {
     const handleTextSelection = () => {
@@ -159,6 +175,7 @@ const PdfViewer = () => {
         setShowButton(true);
       }
     };
+    
 
      const handleClick = (e) => {
       // Check if clicked on the generate button itself
@@ -223,7 +240,7 @@ const PdfViewer = () => {
     }
   }, [token, userId, navigate]);
 
-  const handleProcessText = async () => {
+  const handleProcessText = useCallback(async () => {
     try {
       // Clear the autoSubmission timer when manually generating questions
        // Hide the button immediately after click
@@ -237,13 +254,7 @@ const PdfViewer = () => {
       // Set timer paused flag to prevent new auto-timers
       setIsTimerPaused(true);
       
-      // Get question config from location state or use default
-      const questionSettings = location.state?.questionConfig || {
-        numQuestions: 5,
-        difficulty: 'medium',
-        questionTypes: ['open-ended'],
-        timeLimit: 0
-      };
+      const questionSettings = questionConfig;
 
       // Determine question type format for backend
       const questionType = questionSettings.questionTypes.includes('mixed') ? 
@@ -316,7 +327,7 @@ const PdfViewer = () => {
       // Make sure to reset the timer paused state on error
       setIsTimerPaused(false);
     }
-  };
+}, [userId, questionConfig, selectedText,autoSubmissionTimer]);
 
   // Function to get text content up to current scroll position
   // Convert getVisibleText to a memoized function with useCallback
@@ -412,13 +423,7 @@ const handleAutoSubmission = useCallback(async () => {
       // Store toast reference properly
       const loadingToastId = toast.loading('Auto-generating questions from your reading...');
       
-      // Get question config from location state or use default
-      const questionSettings = location.state?.questionConfig || {
-        numQuestions: 5,
-        difficulty: 'medium',
-        questionTypes: ['open-ended'],
-        timeLimit: 0
-      };
+      const questionSettings = questionConfig;
 
       // Determine question type format for backend
       const questionType = questionSettings.questionTypes.includes('mixed') ? 
@@ -460,7 +465,11 @@ const handleAutoSubmission = useCallback(async () => {
       setIsTimerPaused(true); // Pause timer while showing questions
 
       if (questionSettings.timeLimit > 0) {
-        startQuizTimer(questionSettings.timeLimit, quizIdentifier);
+        // Force a small delay to ensure state updates are processed
+  setTimeout(() => {
+    console.log('Starting delayed timer for auto-generated questions');
+    startQuizTimer(Number(questionSettings.timeLimit), quizIdentifier);
+  }, 300);  // Delay of 300ms to allow state updates
       }
     } 
     catch (error) {
@@ -480,7 +489,7 @@ const handleAutoSubmission = useCallback(async () => {
       maxAllowed: TEXT_LIMITS.MAX_CHARS
     });
   }
-}, [getVisibleText, lastReadPosition, userId, TEXT_LIMITS.MIN_CHARS, TEXT_LIMITS.MAX_CHARS, location.state, isTimerPaused, showQuestions, showResults]);
+}, [getVisibleText, lastReadPosition, userId, TEXT_LIMITS.MIN_CHARS, TEXT_LIMITS.MAX_CHARS, questionConfig, isTimerPaused, showQuestions, showResults]);
 
 
   // Resume timer when questions are closed
@@ -778,7 +787,7 @@ const startQuizTimer = useCallback((timeLimit, explicitQuizId) => {
   console.log('Starting timer for quizId:', currentQuizId);
   
   // Calculate end time
-  const endTime = Date.now() + (timeLimit * 60 * 1000);
+  const endTime = Date.now() + (Number(timeLimit) * 60 * 1000);
   setQuizEndTime(endTime);
   
   // Create interval to update timer display
@@ -802,7 +811,7 @@ const startQuizTimer = useCallback((timeLimit, explicitQuizId) => {
       // Create formatted answers with "unanswered" for missing answers
       const formattedAnswers = {};
       questions.forEach((question, index) => {
-        formattedAnswers[index] = answers[index] || "unanswered";
+        formattedAnswers[index] = currentAnswersRef.current[index] || "unanswered";
       });
       
       // Calculate time taken in seconds
@@ -857,7 +866,7 @@ const startQuizTimer = useCallback((timeLimit, explicitQuizId) => {
   }, 1000);
   
   setQuizTimerInterval(timerInterval);
-}, [userId, questions, answers, startTime, checkForBreakNotification]);
+}, [userId, questions, startTime, checkForBreakNotification]);
 
 
 // Clean up timers on unmount
@@ -1013,6 +1022,13 @@ useEffect(() => {
     window.removeEventListener('beforeunload', handleBeforeUnload);
   };
 }, [userId, notificationIgnored]); 
+
+  const currentAnswersRef = useRef({});
+
+  // Keep the ref updated
+  useEffect(() => {
+    currentAnswersRef.current = answers;
+  }, [answers]);
 
   return (
     <div className="min-h-screen bg-gray-100 p-8">
@@ -1223,9 +1239,9 @@ useEffect(() => {
                         </span>
                       </div>
                       
-                      {result.status === 'wrong' && (
-                        <p className="text-gray-700">{result.question}</p>
-                      )}
+                      
+                      <p className="text-gray-700">{result.question}</p>
+                      
                       
                       <div className="space-y-2">
                         <div>
@@ -1233,7 +1249,7 @@ useEffect(() => {
                           <p className="text-gray-700">{result.user_answer}</p>
                         </div>
                         
-                        {result.status === 'wrong' && (
+                        
                           <>
                             <div>
                               <p className="text-sm text-gray-500">Correct Answer:</p>
@@ -1248,7 +1264,6 @@ useEffect(() => {
                               </ul>
                             </div>
                           </>
-                        )}
                       </div>
                     </div>
                   </div>
