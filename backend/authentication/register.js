@@ -1,6 +1,7 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const User = require('../models/Users');
+const { maybeBootstrapAdmin } = require('../utils/adminBootstrap');
 
 const registerUser = async (req, res) => {
     try {
@@ -29,11 +30,12 @@ const registerUser = async (req, res) => {
             password: hashedPassword
         });
 
+        await maybeBootstrapAdmin(newUser, { User });
         await newUser.save();
 
         // Generate JWT token
         const token = jwt.sign(
-            { userId: newUser._id, role: newUser.role, membership: newUser.membership },
+            { userId: newUser._id, role: newUser.role, membership: newUser.membership, email: newUser.email },
             process.env.JWT_SECRET,
             { expiresIn: '2h' }
         );

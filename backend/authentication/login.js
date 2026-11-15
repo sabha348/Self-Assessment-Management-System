@@ -1,6 +1,7 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const User = require('../models/Users');
+const { maybeBootstrapAdmin } = require('../utils/adminBootstrap');
 
 const loginUser = async (req, res) => {
     try {
@@ -20,6 +21,7 @@ const loginUser = async (req, res) => {
 
         // After successful password verification, update lastLogin
         user.lastLogin = new Date();
+        await maybeBootstrapAdmin(user, { User });
         await user.save();
 
         // Generate JWT token
