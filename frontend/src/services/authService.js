@@ -25,6 +25,16 @@ export const authService = {
     }
   },
 
+  forgotPassword: async (email) => {
+    const response = await axios.post(`${API_URL}/auth/forgot-password`, { email });
+    return response.data;
+  },
+
+  resetPassword: async ({ email, token, password }) => {
+    const response = await axios.post(`${API_URL}/auth/reset-password`, { email, token, password });
+    return response.data;
+  },
+
   getUserProfile: async (token) => {
     try {
       const response = await axios.get(`${API_URL}/user/profile`, {
