@@ -1,11 +1,11 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const User = require('../models/Users');
+const { maybeBootstrapAdmin } = require('../utils/adminBootstrap');
 
 const loginUser = async (req, res) => {
     try {
         const { email, password } = req.body;
-        console.log('email',email);
 
         // Check if user exists
         const user = await User.findOne({ email });
@@ -13,19 +13,15 @@ const loginUser = async (req, res) => {
             return res.status(400).json({ message: 'Invalid credentials' });
         }
 
-        console.log('user',user);
-        console.log('user.password',user.password);
-        console.log('password',password);
-
         // Compare passwords
         const isMatch = await bcrypt.compare(password, user.password);
-        console.log('isMatch',isMatch);
         if (!isMatch) {
             return res.status(400).json({ message: 'Invalid credentials' });
         }
 
         // After successful password verification, update lastLogin
         user.lastLogin = new Date();
+        await maybeBootstrapAdmin(user, { User });
         await user.save();
 
         // Generate JWT token

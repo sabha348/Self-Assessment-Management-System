@@ -9,7 +9,10 @@ const fileRoutes = require('./routes/fileRoutes');
 const timetableRoutes = require('./routes/timetableRoutes');
 const quizRoutes = require('./routes/quizRouter');
 const registerUser = require('./authentication/register');
-const loginUser = require('./authentication/login'); 
+const loginUser = require('./authentication/login');
+const { createPasswordResetRouter } = require('./authentication/passwordReset');
+const { sendMail } = require('./utils/mailer');
+const User = require('./models/Users');
 const adminRoutes = require('./routes/adminRoutes');
 const { upload, uploadFile, getFiles } = require('./services/fileService');
 const assessmentRouter = require('./routes/assessmentRouter');
@@ -61,6 +64,11 @@ app.use('/api', helpRequestRouter); // Add this line with your other app.use sta
 app.use('/api/quizzes', quizRoutes);
 app.use('/api/auth/register', registerUser);
 app.use('/api/auth/login', loginUser);
+app.use('/api/auth', createPasswordResetRouter({
+  User,
+  sendMail,
+  clientUrl: process.env.CLIENT_URL || 'http://localhost:3000',
+}));
 app.use('/api/user', userRoutes);
 app.use('/api/folders', folderRoutes);
 app.use('/api/files', fileRoutes);

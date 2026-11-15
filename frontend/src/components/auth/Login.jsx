@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { authService } from '../../services/authService';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { EyeIcon, EyeOffIcon } from 'lucide-react';
 
 const Login = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const justReset = location.state?.passwordReset;
   const [credentials, setCredentials] = useState({
     email: '',
     password: '',
@@ -41,6 +43,11 @@ const Login = () => {
         {/* Right Section - Login Form */}
         <div className="w-1/2 p-6 bg-white rounded-lg shadow-md">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">Login</h2>
+          {justReset && (
+            <p className="text-green-700 bg-green-50 p-2 rounded-lg mb-3" role="status">
+              Password updated. Log in with your new password.
+            </p>
+          )}
           <form onSubmit={handleSubmit}>
             <div className="mb-4">
               <label className="block text-gray-700">Email</label>
@@ -68,6 +75,9 @@ const Login = () => {
                                 {showPassword ? <EyeOffIcon size={20} /> : <EyeIcon size={20} />}
                 </button>
               </div>
+            </div>
+            <div className="text-right -mt-2 mb-4">
+              <Link to="/forgot-password" className="text-sm text-blue-600">Forgot password?</Link>
             </div>
             <button type="submit" className="w-full bg-black text-white py-2 rounded-lg">
               Login

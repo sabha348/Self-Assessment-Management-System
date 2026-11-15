@@ -7,6 +7,11 @@ const UserAnswer = require("../models/UserAnswer");
 const mongoose = require("mongoose");
 // Import the text categorizer
 const { categorizeText } = require("../utils/TextCategory");
+const { authenticateToken } = require("../middleware/authenticate");
+
+// Every quiz route acts on behalf of the logged-in user. The user id comes
+// from the verified JWT, never from the request body or URL.
+router.use(authenticateToken);
 
 // Initiate assessment route
 router.post("/", async (req, res) => {
@@ -14,13 +19,13 @@ router.post("/", async (req, res) => {
     const {
       text,
       numQuestions = 5,
-      userId,
       difficulty = "medium",
       type = "open-ended",
       timeLimit = 0,
       topic = "General",
       subject = "Knowledge",
     } = req.body;
+    const userId = req.user.userId;
 
     if (!text || typeof text !== "string") {
       return res.status(400).json({ error: "Valid text input is required" });
@@ -287,7 +292,8 @@ router.post("/:quizId/submit", async (req, res) => {
   console.log("Received request to submit answers");
   try {
     const { quizId } = req.params;
-    const { answers, userId, timeTaken } = req.body;
+    const { answers, timeTaken } = req.body;
+    const userId = req.user.userId;
     console.log("answers:", answers);
 
     if (!quizId || !answers || !userId) {
@@ -478,6 +484,9 @@ router.post("/:quizId/submit", async (req, res) => {
 router.get("/:quizId/results/:userId", async (req, res) => {
   try {
     const { quizId, userId } = req.params;
+    if (userId !== req.user.userId && req.user.role !== "admin") {
+      return res.status(403).json({ error: "Not authorized to view these results" });
+    }
 
     // Verify quiz exists
     const quiz = await Quiz.findById(quizId);
