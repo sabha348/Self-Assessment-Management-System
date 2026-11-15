@@ -9,11 +9,11 @@ const AssessmentResult = require('../models/AssessmentResult');
 const User = require('../models/Users');
 const bcrypt = require('bcrypt'); // Import bcrypt
 
-// Route to create a new user (Registration should be public)
-router.post('/', userController.createUser);
-
-// Route to get all users (Only admin should have access)
-router.get('/', userController.getAllUsers);
+// Admin-only: public registration lives at /api/auth/register.
+// (Previously unauthenticated: anyone could list users with password hashes
+// or create an account with role=admin.)
+router.post('/', authenticateToken, authorizeRole('admin'), userController.createUser);
+router.get('/', authenticateToken, authorizeRole('admin'), userController.getAllUsers);
 
 
 router.get("/me", authenticateToken, async (req, res) => {
