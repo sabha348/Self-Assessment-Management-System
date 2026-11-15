@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const User = require('../models/Users');
 const Subscription = require('../models/Subscription');
 const Assessment = require('../models/AssessmentResult');
@@ -112,7 +113,7 @@ exports.updateUser = async (req, res) => {
     
     // Log admin action
     await AdminLog.create({
-      adminId: req.user._id,
+      adminId: req.user.userId,
       action: 'UPDATE_USER',
       details: `Updated user ${user.email}`,
       targetId: user._id
@@ -127,7 +128,7 @@ exports.updateUser = async (req, res) => {
 exports.deleteUser = async (req, res) => {
   try {
     console.log("Delete function called with ID:", req.params.id);
-    console.log("Current user:", req.user ? req.user._id : "undefined");
+    console.log("Current user:", req.user ? req.user.userId : "undefined");
     
     // First, get the user
     const user = await User.findById(req.params.id);
@@ -138,7 +139,7 @@ exports.deleteUser = async (req, res) => {
     }
     
     // Check if req.user exists and then check if admin is trying to delete themselves
-    if (req.user && req.user._id && user._id.toString() === req.user._id.toString()) {
+    if (req.user && req.user.userId && user._id.toString() === req.user.userId.toString()) {
       return res.status(400).json({ message: 'You cannot delete your own account' });
     }
     
@@ -153,7 +154,7 @@ exports.deleteUser = async (req, res) => {
     
     // // Log admin action
     // await AdminLog.create({
-    //   adminId: req.user._id,
+    //   adminId: req.user.userId,
     //   action: 'DELETE_USER',
     //   details: `Deleted user ${user.email}`,
     //   targetId: user._id
@@ -173,7 +174,8 @@ exports.resetUserPassword = async (req, res) => {
     }
     
     // Generate temporary password
-    const tempPassword = Math.random().toString(36).slice(-8);
+    // Cryptographically random temporary password (Math.random is predictable).
+    const tempPassword = crypto.randomBytes(9).toString('base64url');
     const hashedPassword = await bcrypt.hash(tempPassword, 10);
     
     user.password = hashedPassword;
@@ -182,7 +184,7 @@ exports.resetUserPassword = async (req, res) => {
     
     // Log admin action
     await AdminLog.create({
-      adminId: req.user._id,
+      adminId: req.user.userId,
       action: 'RESET_PASSWORD',
       details: `Reset password for user ${user.email}`,
       targetId: user._id
@@ -307,16 +309,16 @@ exports.updateSettings = async (req, res) => {
     
     // Add metadata (safely check for req.user existence)
     settings.lastUpdated = new Date();
-    if (req.user && req.user._id) {
-      settings.updatedBy = req.user._id;
+    if (req.user && req.user.userId) {
+      settings.updatedBy = req.user.userId;
     }
     
     await settings.save();
     
     // Only create log if user info is available
-    if (req.user && req.user._id) {
+    if (req.user && req.user.userId) {
       await AdminLog.create({
-        adminId: req.user._id,
+        adminId: req.user.userId,
         action: 'UPDATE_SETTINGS',
         details: `Updated system settings`
       });

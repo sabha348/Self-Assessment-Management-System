@@ -17,6 +17,11 @@ const userSchema = new mongoose.Schema({
   stripeCustomerId: { type: String }, // Store Stripe customer ID
   stripePaymentId: { type: String }, // Store Stripe payment ID for one-time purchase
   lastLogin: { type: Date },
+  // Password reset: only a SHA-256 hash of the emailed token is stored.
+  resetPasswordTokenHash: { type: String },
+  resetPasswordExpires: { type: Date },
+  resetPasswordRequestedAt: { type: Date },
+  passwordResetRequired: { type: Boolean, default: false },
   createdAt: { type: Date, default: Date.now },
   preferences: {
     questionConfig: {
