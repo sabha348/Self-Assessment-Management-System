@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 from google.genai import errors
 
-from app.embeddings import GeminiEmbedder, l2_normalize
+from app.embeddings import EmbeddingError, GeminiEmbedder, l2_normalize
 
 
 class FakeModels:
@@ -59,14 +59,14 @@ def test_retries_rate_limits_then_succeeds():
 
 def test_does_not_retry_client_errors():
     models = FakeModels(fail_first=1, code=400)
-    with pytest.raises(errors.APIError):
+    with pytest.raises(EmbeddingError):
         make(models).embed_documents(["x"])
     assert len(models.calls) == 1
 
 
 def test_gives_up_after_max_retries():
     models = FakeModels(fail_first=10, code=503)
-    with pytest.raises(errors.APIError):
+    with pytest.raises(EmbeddingError):
         make(models, max_retries=2).embed_documents(["x"])
     assert len(models.calls) == 3
 
@@ -83,3 +83,13 @@ def test_l2_normalize_handles_zero_vectors():
 def test_requires_api_key_without_client():
     with pytest.raises(ValueError):
         GeminiEmbedder(api_key="")
+
+
+def test_network_errors_become_embedding_errors():
+    class Boom:
+        def embed_content(self, **kw):
+            raise ConnectionError("tls failed")
+
+    emb = GeminiEmbedder(client=SimpleNamespace(models=Boom()), dim=8, sleep=lambda s: None)
+    with pytest.raises(EmbeddingError, match="ConnectionError"):
+        emb.embed_query("x")

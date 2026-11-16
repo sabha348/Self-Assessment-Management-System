@@ -1,0 +1,35 @@
+# Dev stack for the RAG service: Postgres+pgvector and the FastAPI app.
+#   GOOGLE_API_KEY=... SERVICE_TOKEN=dev-token docker compose -f compose.dev.yml up --build
+# The full stack (Mongo, backend, frontend) is in docker-compose.yml (M3).
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: rag
+      POSTGRES_PASSWORD: rag
+      POSTGRES_DB: rag
+    ports: ["5433:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rag -d rag"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  rag:
+    build: ./rag_service
+    environment:
+      DATABASE_URL: postgresql://rag:rag@db:5432/rag
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:?set GOOGLE_API_KEY}
+      SERVICE_TOKEN: ${SERVICE_TOKEN:?set SERVICE_TOKEN}
+    ports: ["8001:8001"]
+    depends_on:
+      db: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  pgdata:

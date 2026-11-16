@@ -2,12 +2,13 @@ from contextlib import asynccontextmanager
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile, status
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, model_validator
 
 from . import __version__
 from .auth import require_service_token
 from .config import Settings, get_settings
-from .embeddings import Embedder, build_embedder
+from .embeddings import Embedder, EmbeddingError, build_embedder
 from .ingest import OwnershipError, ingest_pdf
 from .pdf import PdfError
 from .retrieval import Mode, retrieve
@@ -35,6 +36,12 @@ app = FastAPI(
     description="PDF ingestion with page-aware chunking, embeddings in pgvector, and top-k retrieval.",
     lifespan=lifespan,
 )
+
+
+@app.exception_handler(EmbeddingError)
+def _embedding_failed(request: Request, exc: EmbeddingError) -> JSONResponse:
+    # Upstream dependency failed: 502, not a generic 500, and no stack trace.
+    return JSONResponse(status_code=502, content={"detail": f"embedding provider unavailable: {exc}"})
 
 
 def get_store(request: Request) -> ChunkStore:

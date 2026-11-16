@@ -132,3 +132,17 @@ def test_page_filter(client):
         json={"query": "function", "user_id": "u1", "page_min": 4, "page_max": 4, "k": 5},
     )
     assert [ch["page_start"] for ch in r.json()["chunks"]] == [4]
+
+
+def test_embedding_outage_returns_502(client, monkeypatch):
+    from app.embeddings import EmbeddingError
+
+    c, emb = client
+
+    def down(_):
+        raise EmbeddingError("embedding request failed: ConnectError")
+
+    monkeypatch.setattr(emb, "embed_query", down)
+    r = c.post("/v1/retrieve", headers=H, json={"query": "q", "user_id": "u1"})
+    assert r.status_code == 502
+    assert "embedding provider unavailable" in r.json()["detail"]

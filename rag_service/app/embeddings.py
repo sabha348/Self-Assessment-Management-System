@@ -23,6 +23,10 @@ def l2_normalize(vectors: np.ndarray) -> np.ndarray:
     return vectors / norms
 
 
+class EmbeddingError(RuntimeError):
+    """The embedding provider failed (network, auth, quota, bad response)."""
+
+
 # Status codes worth retrying: rate limited, or a transient server error.
 RETRYABLE = {429, 500, 502, 503, 504}
 
@@ -73,15 +77,17 @@ class GeminiEmbedder:
                     break
                 except errors.APIError as e:
                     if e.code not in RETRYABLE or attempt == self.max_retries:
-                        raise
+                        raise EmbeddingError(f"embedding API error {e.code}") from e
                     self._sleep(min(2**attempt, 30))  # exponential backoff, capped
+                except Exception as e:  # network / TLS / unexpected client failure
+                    raise EmbeddingError(f"embedding request failed: {type(e).__name__}") from e
             vectors = [e.values for e in resp.embeddings]
             if len(vectors) != len(batch):
-                raise RuntimeError(f"expected {len(batch)} embeddings, got {len(vectors)}")
+                raise EmbeddingError(f"expected {len(batch)} embeddings, got {len(vectors)}")
             out.extend(vectors)
         arr = np.asarray(out, dtype=np.float32).reshape(len(out), -1) if out else np.zeros((0, self.dim))
         if arr.shape[1] != self.dim:
-            raise RuntimeError(f"model returned dim {arr.shape[1]}, expected {self.dim}")
+            raise EmbeddingError(f"model returned dim {arr.shape[1]}, expected {self.dim}")
         return l2_normalize(arr)
 
     def embed_documents(self, texts: Sequence[str]) -> np.ndarray:
