@@ -1,0 +1,75 @@
+# Whole SmartAssess stack on one machine:
+#   cp .env.example .env   # fill in GOOGLE_API_KEY (the rest have dev defaults)
+#   docker compose up --build
+# App: http://localhost:3000   API: http://localhost:8000/api   RAG: http://localhost:8001/docs
+services:
+  mongo:
+    image: mongo:7
+    volumes: [mongodata:/data/db]
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ping: 1}).ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: rag
+      POSTGRES_PASSWORD: rag
+      POSTGRES_DB: rag
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rag -d rag"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  rag:
+    build: ./rag_service
+    environment:
+      DATABASE_URL: postgresql://rag:rag@db:5432/rag
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:?set GOOGLE_API_KEY in .env}
+      SERVICE_TOKEN: ${RAG_SERVICE_TOKEN:-dev-service-token}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.5-flash-lite}
+    ports: ["8001:8001"]
+    depends_on:
+      db: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  backend:
+    build: ./backend
+    environment:
+      PORT: 8000
+      MONGODB_URI: mongodb://mongo:27017/sams
+      JWT_SECRET: ${JWT_SECRET:-dev-only-change-me}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.5-flash-lite}
+      RAG_ENABLED: "true"
+      RAG_URL: http://rag:8001
+      RAG_SERVICE_TOKEN: ${RAG_SERVICE_TOKEN:-dev-service-token}
+      ALLOWED_ORIGINS: http://localhost:3000
+      CLIENT_URL: http://localhost:3000
+      EMAIL_USER: ${EMAIL_USER:-}
+      EMAIL_PASS: ${EMAIL_PASS:-}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+    ports: ["8000:8000"]
+    depends_on:
+      mongo: { condition: service_healthy }
+      rag: { condition: service_healthy }
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        REACT_APP_API_URL: http://localhost:8000/api
+    ports: ["3000:80"]
+    depends_on: [backend]
+
+volumes:
+  mongodata:
+  pgdata:
