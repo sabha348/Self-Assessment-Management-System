@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 const Quiz = require("../models/Quiz");
 const Question = require("../models/Question");
-const { runPythonProcess } = require("../utils/pythonRunner");
+const { getGrader } = require("../services/grading");
 const UserAnswer = require("../models/UserAnswer");
 
 // Get all unique subjects from quizzes for the logged-in user
@@ -1109,7 +1109,8 @@ const updateQuestion = async (req, res) => {
 const submitAssessment = async (req, res) => {
   console.log("Received request to submit answers without quiz ID");
   try {
-    const { answers, userId, timeTaken, includeUnanswered } = req.body;
+    const { answers, timeTaken, includeUnanswered } = req.body;
+    const userId = req.user.userId; // from the verified JWT, never the request body
 
     if (!answers || !userId) {
       return res
@@ -1158,43 +1159,15 @@ const submitAssessment = async (req, res) => {
       return res.status(404).json({ error: "No valid questions found" });
     }
 
-    // Format data for evaluation
-    let questionTexts = [];
-    let userAnswersData = [];
-    let correctAnswersData = [];
-
-    questionsData.forEach((item) => {
-      questionTexts.push(item.question.question);
-      userAnswersData.push(item.userAnswer);
-      correctAnswersData.push(
-        item.question.correctAnswer || "No answer available"
-      );
-    });
-
-    // Prepare evaluation data
-    const evalData = {
-      answers: userAnswersData,
-      correct_answers: correctAnswersData,
-    };
-
-    // Evaluate answers using Python script
     try {
-      const results = await runPythonProcess(
-        "./python_scripts/evaluate_answers.py",
-        [JSON.stringify(evalData)]
-      );
+      const evaluations = await getGrader().grade(userId, questionsData);
 
-      // Store user answers and evaluation results
-      const userAnswerPromises = [];
       let totalScore = 0;
-
-      for (let i = 0; i < results.evaluations.length; i++) {
-        const evaluation = results.evaluations[i];
-        const item = questionsData[i];
-
-        if (item) {
-          // Save user answer to database
-          const userAnswer = new UserAnswer({
+      await Promise.all(
+        evaluations.map((evaluation, i) => {
+          if (evaluation.is_correct) totalScore += 1;
+          const item = questionsData[i];
+          return new UserAnswer({
             userId,
             questionId: item.question.questionId,
             userAnswer: evaluation.user_answer,
@@ -1202,41 +1175,33 @@ const submitAssessment = async (req, res) => {
             quizId: item.question.quizeRef,
             missingPoint: evaluation.missing_points || [],
             isCorrect: evaluation.is_correct,
+            verdict: evaluation.verdict,
+            feedback: evaluation.feedback || undefined,
+            graderVersion: evaluation.grader,
             timeTaken: timeTaken ? timeTaken / questionsData.length : null,
-          });
-
-          userAnswerPromises.push(userAnswer.save());
-          if (evaluation.is_correct) {
-            totalScore += 1;
-          }
-        }
-      }
-
-      // Wait for all user answers to be saved
-      await Promise.all(userAnswerPromises);
-
-      // Format results for frontend
-      const formattedResults = results.evaluations.map((evaluation, index) => ({
-        questionId: questionsData[index].question.questionId,
-        status: evaluation.is_correct ? "correct" : "wrong",
-        accuracy: evaluation.accuracy,
-        user_answer: evaluation.user_answer,
-        correct_answer: evaluation.correct_answer,
-        question: questionTexts[index],
-        ...(evaluation.is_correct
-          ? {}
-          : {
-              missing_points: evaluation.missing_points || [],
-            }),
-      }));
+          }).save();
+        })
+      );
 
       res.json({
-        evaluations: formattedResults,
-        totalScore: totalScore,
+        evaluations: evaluations.map((evaluation, i) => ({
+          questionId: questionsData[i].question.questionId,
+          status: evaluation.is_correct ? "correct" : "wrong",
+          verdict: evaluation.verdict,
+          accuracy: evaluation.accuracy,
+          user_answer: evaluation.user_answer,
+          correct_answer: evaluation.correct_answer,
+          question: questionsData[i].question.question,
+          feedback: evaluation.feedback,
+          citations: evaluation.citations || [],
+          grounded: evaluation.grader === "rag-points-v1",
+          ...(evaluation.is_correct ? {} : { missing_points: evaluation.missing_points || [] }),
+        })),
+        totalScore,
       });
     } catch (error) {
       console.error("Error evaluating answers:", error);
-      res.status(500).json({
+      res.status(502).json({
         error: "Evaluation process failed",
         details: error.message,
       });
