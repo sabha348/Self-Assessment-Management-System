@@ -21,7 +21,7 @@ def test_each_chunk_is_an_exact_slice_and_respects_size():
     chunks = chunk_pages(pages, size=500, overlap=100)
     assert len(chunks) > 3
     for c in chunks:
-        assert doc.text[c.char_start:c.char_end] == c.text
+        assert doc.text[c.char_start : c.char_end] == c.text
         assert len(c.text) <= 500
         assert c.text == c.text.strip()
     assert [c.index for c in chunks] == list(range(len(chunks)))
@@ -56,7 +56,7 @@ def test_neighbouring_chunks_overlap_but_always_make_progress():
     for prev, cur in zip(chunks, chunks[1:], strict=False):
         assert cur.char_start > prev.char_start
         assert cur.char_start <= prev.char_end  # overlap or adjacency, never a gap...
-        gap_text = join_pages(pages).text[prev.char_end:cur.char_start]
+        gap_text = join_pages(pages).text[prev.char_end : cur.char_start]
         assert gap_text.strip() == ""  # ...other than whitespace
     overlapping = sum(cur.char_start < prev.char_end for prev, cur in zip(chunks, chunks[1:], strict=False))
     assert overlapping >= len(chunks) // 2
