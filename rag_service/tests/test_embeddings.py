@@ -4,19 +4,21 @@ import numpy as np
 import pytest
 from google.genai import errors
 
-from app.embeddings import EmbeddingError, GeminiEmbedder, l2_normalize
+from app.embeddings import EmbeddingError, GeminiEmbedder, RateLimiter, l2_normalize, server_retry_delay
 
 
 class FakeModels:
-    def __init__(self, dim=8, fail_first=0, code=429):
+    def __init__(self, dim=8, fail_first=0, code=429, retry_delay=None):
         self.dim, self.fail_first, self.code = dim, fail_first, code
+        details = [{"@type": "type.googleapis.com/google.rpc.RetryInfo", "retryDelay": retry_delay}]
+        self.body = {"error": {"message": "x", "status": "x", "details": details if retry_delay else []}}
         self.calls = []
 
     def embed_content(self, model, contents, config):
         self.calls.append((model, list(contents), config.task_type, config.output_dimensionality))
         if self.fail_first:
             self.fail_first -= 1
-            raise errors.APIError(self.code, {"error": {"message": "x", "status": "x"}})
+            raise errors.APIError(self.code, self.body)
         # Unnormalised vectors, like reduced-dimension Gemini output.
         return SimpleNamespace(
             embeddings=[SimpleNamespace(values=[float(len(t))] * self.dim) for t in contents]
@@ -93,3 +95,56 @@ def test_network_errors_become_embedding_errors():
     emb = GeminiEmbedder(client=SimpleNamespace(models=Boom()), dim=8, sleep=lambda s: None)
     with pytest.raises(EmbeddingError, match="ConnectionError"):
         emb.embed_query("x")
+
+
+def test_uses_the_retry_delay_the_server_asks_for():
+    models = FakeModels(fail_first=1, code=429, retry_delay="23s")
+    slept = []
+    emb = GeminiEmbedder(client=SimpleNamespace(models=models), dim=8, sleep=slept.append)
+    emb.embed_query("x")
+    assert slept == [24.0]  # 23s + 1s margin
+
+
+def test_server_retry_delay_parsing():
+    e = errors.APIError(429, {"error": {"details": [{"@type": "x.RetryInfo", "retryDelay": "1.5s"}]}})
+    assert server_retry_delay(e) == 1.5
+    assert server_retry_delay(errors.APIError(429, {"error": {}})) is None
+
+
+class FakeClock:
+    def __init__(self):
+        self.t = 0.0
+
+    def __call__(self):
+        return self.t
+
+    def sleep(self, s):
+        self.t += s
+
+
+def test_rate_limiter_paces_items_per_minute():
+    clock = FakeClock()
+    rl = RateLimiter(100, clock=clock, sleep=clock.sleep)
+    rl.acquire(60)
+    rl.acquire(40)
+    assert clock.t == 0  # 100 items fit in the first minute
+    rl.acquire(30)
+    assert clock.t == pytest.approx(60)  # had to wait for the window to slide
+    rl.acquire(0)
+    assert RateLimiter(0).acquire(10_000) is None  # disabled
+
+
+def test_embedder_splits_batches_to_fit_the_rate_limit():
+    clock = FakeClock()
+    models = FakeModels()
+    emb = GeminiEmbedder(
+        client=SimpleNamespace(models=models),
+        dim=8,
+        batch_size=64,
+        max_per_minute=50,
+        sleep=clock.sleep,
+        clock=clock,
+    )
+    emb.embed_documents([str(i) for i in range(120)])
+    assert [len(c[1]) for c in models.calls] == [50, 50, 20]
+    assert clock.t == pytest.approx(120)  # two full windows waited

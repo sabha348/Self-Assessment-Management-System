@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     embedding_model: str = "gemini-embedding-001"
     embedding_dim: int = 768  # must match the vector(N) column in migrations
     embedding_batch_size: int = 64
+    # Texts embedded per minute (0 = unlimited). Gemini's free tier allows 100.
+    embedding_max_per_minute: int = 90
 
     # Chunking (characters; ~4 characters per English token).
     chunk_size: int = 1500
