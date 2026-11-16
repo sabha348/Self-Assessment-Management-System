@@ -148,7 +148,7 @@ Every commit is small and leaves the app working. A feature flag, `RAG_ENABLED`,
 8. `refactor(grading): quizRouter + assessmentController submit via /grade`
 9. `feat(ui): PdfViewer sends documentId + current page/selection; citation chips ("p. 12") jump to that page`
 10. `feat(ui): results view shows feedback with page citations`
-11. `chore: remove python_scripts/ and pythonRunner (old path)`
+11. ~~`chore: remove python_scripts/ and pythonRunner (old path)`~~ **Moved to M4.** Production doesn't run the RAG service until M4, so the old path stays as the fallback (`RAG_ENABLED=false`, and also used while a PDF is still indexing). It's removed once the service is live.
 
 → **Stop: open the M2 PR.**
 
