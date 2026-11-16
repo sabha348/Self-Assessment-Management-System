@@ -35,6 +35,8 @@ class GeminiLLM:
         thinking_level: str | None = "low",
         max_retries: int = 4,
         fallback_model: str | None = None,
+        timeout_s: float = 45.0,
+        max_wait_s: float = 10.0,
         client=None,
         sleep: Callable[[float], None] = time.sleep,
     ):
@@ -43,13 +45,23 @@ class GeminiLLM:
 
             if not api_key:
                 raise ValueError("GOOGLE_API_KEY is required for the LLM")
-            client = genai.Client(api_key=api_key)
+            # Per-request timeout (ms): a hung or very slow call must not hold a
+            # student's request for minutes; it fails over to the fallback model.
+            # Gemini also enforces it as a server deadline, which must be >= 10 s.
+            # SDK-internal retries are switched off (attempts=1): this class owns retry, the
+            # server's RetryInfo delay and model fallback, and two stacked retry loops made
+            # one slow call take minutes.
+            client = genai.Client(
+                api_key=api_key,
+                http_options={"timeout": int(max(timeout_s, 10.0) * 1000), "retry_options": {"attempts": 1}},
+            )
         self._client = client
         self.model = model
         self.name = model
         self.thinking_level = thinking_level
         self.max_retries = max_retries
         self.fallback_model = fallback_model
+        self.max_wait_s = max_wait_s  # longest back-off worth waiting on one model
         self._sleep = sleep
 
     def _call(self, model: str, prompt: str, config, retries: int, schema_name: str):
@@ -66,10 +78,18 @@ class GeminiLLM:
                 if e.code not in RETRYABLE or attempt == retries:
                     raise _Exhausted(e.code) if e.code in RETRYABLE else LLMError(f"LLM API error {e.code}") from e
                 delay = server_retry_delay(e)
-                wait = min(delay + 1 if delay is not None else 2**attempt, 65)
+                if delay is not None and delay > self.max_wait_s:
+                    # e.g. a quota that resets in a minute: a student shouldn't wait for it,
+                    # and the fallback model has its own quota.
+                    log.warning("LLM %s returned %s asking to wait %.0fs; not waiting", model, e.code, delay)
+                    raise _Exhausted(e.code) from e
+                wait = min(delay + 1 if delay is not None else 2**attempt, self.max_wait_s)
                 log.warning("LLM %s returned %s, retry %d in %.0fs", model, e.code, attempt + 1, wait)
                 self._sleep(wait)
-            except Exception as e:  # network / TLS
+            except Exception as e:  # network / TLS / timeout
+                if "timeout" in type(e).__name__.lower():
+                    log.warning("LLM %s timed out after %.0fs", model, time.monotonic() - started)
+                    raise _Exhausted(504) from e  # slow: don't wait again on the same model
                 raise LLMError(f"LLM request failed: {type(e).__name__}") from e
 
     def generate_json(self, prompt: str, schema: type[T], temperature: float = 0.2) -> T:
@@ -112,5 +132,8 @@ class _Exhausted(Exception):
 
 def build_llm(settings) -> LLM:
     return GeminiLLM(
-        api_key=settings.google_api_key, model=settings.llm_model, fallback_model=settings.llm_fallback_model or None
+        api_key=settings.google_api_key,
+        model=settings.llm_model,
+        fallback_model=settings.llm_fallback_model or None,
+        timeout_s=settings.llm_timeout_s,
     )

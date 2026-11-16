@@ -100,7 +100,8 @@ class GeminiEmbedder:
 
             if not api_key:
                 raise ValueError("GOOGLE_API_KEY is required for Gemini embeddings")
-            client = genai.Client(api_key=api_key)
+            # Our own retry/backoff/rate limiting only; no SDK-internal retries stacked on top.
+            client = genai.Client(api_key=api_key, http_options={"timeout": 60_000, "retry_options": {"attempts": 1}})
         self._client = client
         self.model = model
         self.dim = dim

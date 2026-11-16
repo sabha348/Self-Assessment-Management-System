@@ -1,7 +1,13 @@
 const express = require("express");
 const router = express.Router();
 require("dotenv").config()
-const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+// Payments are optional: without STRIPE_SECRET_KEY the app still starts and
+// the payment routes answer 503 instead of the whole server crashing.
+const stripe = process.env.STRIPE_SECRET_KEY ? require("stripe")(process.env.STRIPE_SECRET_KEY) : null;
+router.use((req, res, next) => {
+    if (!stripe) return res.status(503).json({ error: "Payments are not configured on this server" });
+    next();
+});
 const User = require('../models/Users');
 const {authenticateToken} = require('../middleware/authenticate');
 const Payment = require('../models/Payment');
@@ -178,7 +184,6 @@ router.post('/subscription/cancel', authenticateToken, async (req, res) => {
     // The membership checker cron job will downgrade them when membershipExpiry passes
     
     // Optionally if using Stripe, cancel the subscription there too
-    const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
     if (user.stripeSubscriptionId) {
       await stripe.subscriptions.update(user.stripeSubscriptionId, {
         cancel_at_period_end: true
