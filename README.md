@@ -1,181 +1,153 @@
-# Self-Assessment Management System (SAMS)
+# SmartAssess
 
-## Overview
-The Assessment Management System (SAMS) is a comprehensive web application designed to help users self-assess their comprehension of various topics. Built with the MERN stack (MongoDB, Express.js, React.js, Node.js) and Python for AI capabilities, the system provides intelligent question generation, answer evaluation, and personalized learning analytics.
+A self-study platform: upload a PDF, read it, and answer questions generated **only from the pages
+you are reading**, with page citations on every question and on every piece of grading feedback.
+Progress is tracked from subject down to concept level.
 
-## Features
-### Core Features
-- AI-powered question generation from uploaded content
-- Intelligent answer evaluation with detailed feedback
-- Multiple question formats (MCQ, Fill in the blanks, Open-ended), for now open ended.
-- Performance analytics and progress tracking
-- Premium membership system
+MERN app + a Python **RAG service** (FastAPI, pgvector, Gemini), with evals for retrieval and grading.
 
-### Admin Features
+| Questions cite the pages they come from | Grading: verdict, feedback, and a link back to the page |
+|---|---|
+| ![Generated questions with page citations](docs/screenshots/grounded-questions.png) | ![Graded answers with feedback and Review links](docs/screenshots/grounded-results.png) |
 
-- Subscription Management
+## Results
 
-  - View and manage user subscriptions
-  - Monitor subscription status and renewals
-  - Handle subscription upgrades/downgrades
-  - Process refund requests
+**Retrieval** (42 hand-labelled questions over a 244-page textbook; details in
+[`evals/results/retrieval.md`](evals/results/retrieval.md)):
 
+| mode | recall@1 | **recall@5** | MRR@5 |
+|---|---|---|---|
+| dense (pgvector, Gemini embeddings) | 0.81 | **1.00** (42/42, 95% CI 0.92–1.00) | 0.90 |
+| keyword (Postgres FTS) | 0.24 | 0.74 | 0.42 |
+| hybrid (reciprocal rank fusion) | 0.62 | 0.91 | 0.75 |
 
-- User Management
+Hybrid was *worse* than dense here (the keyword ranking adds noise), so the service defaults to dense.
 
-  - View all user accounts
-  - Monitor user activity
-  - Handle user reports/issues
+**Grading** (auto-grader vs. the owner's blind hand grades on 30 answers; details in
+[`evals/grading/results/results.md`](evals/grading/results/results.md)):
 
+| grader | exact agreement | Cohen's κ | weighted κ | correct vs. not | correct↔incorrect errors |
+|---|---|---|---|---|---|
+| **new: point-based, grounded** | **0.77** | **0.65** | **0.84** | **0.97** | **0** |
+| old: holistic score + regex | 0.63 | 0.45 | 0.54 | 0.80 | 2 |
 
-- Analytics Dashboard
+The new grader never confuses a correct answer with a wrong one; its misses are one step apart,
+mostly being stricter than a human on short, vague answers. 27/30 verdicts were identical across two runs.
 
-  - Subscription metrics
-  - Revenue reports
-  - User engagement statistics
-  - Feature usage analytics
+## Architecture
 
+```mermaid
+flowchart LR
+  subgraph Browser
+    UI[React app<br/>PDF viewer, quizzes, analytics]
+  end
+  subgraph Node["Node / Express API"]
+    API[Auth JWT<br/>quizzes, practice, analytics]
+    IDX[Background indexer]
+    GR[Grader router]
+  end
+  subgraph RAG["RAG service (FastAPI)"]
+    ING[Ingest:<br/>pypdf → page-aware chunks]
+    RET[Retrieve top-k<br/>dense / keyword / hybrid]
+    GEN[Grounded question<br/>generation]
+    GRD[Point-based grading]
+  end
+  Mongo[(MongoDB<br/>users, quizzes, answers,<br/>PDFs in GridFS)]
+  PG[(Postgres + pgvector<br/>chunks, embeddings, FTS)]
+  Gemini[[Gemini API<br/>embeddings + LLM]]
 
-### Premium Features
-- Unlimited question generation
-- Customizable question difficulty
-- Smart break suggestions based on retention
-- Automated study timetable generation
-- Advanced analytics dashboard
-
-## Tech Stack
-### Frontend
-- React.js
-- Redux for state management
-- Material-UI/Tailwind CSS for styling
-- Chart.js for analytics visualization
-
-### Backend
-- Node.js with Express.js
-- MongoDB for database
-- Python for AI processing
-- JWT for authentication
-
-## AI Components
-- Google's Gemini AI model integration for:
-  - Intelligent question generation from input text
-  - Advanced answer evaluation with semantic analysis
-  - Smart comparison between user answers and correct responses
-- Features multiple evaluation modes:
-  - Lenient: More flexible scoring with higher partial match bonuses
-  - Balanced: Standard evaluation with moderate weights
-  - Strict: Rigorous evaluation with emphasis on semantic accuracy
-- Custom similarity evaluation system using:
-  - Semantic similarity scoring
-  - Keyword matching and analysis
-  - Configurable accuracy thresholds
-- Fallback mechanisms for robust operation
-  
-
-## Installation
-
-### Prerequisites
-```bash
-# Node.js 16+ and npm
-# Python 3.8+
-# MongoDB 4.4+
+  UI -- "JWT" --> API
+  API --> Mongo
+  API -- "upload" --> IDX -- "X-Service-Token" --> ING
+  API -- "selected text + pages" --> GEN
+  GR --> GRD
+  ING --> PG
+  RET --> PG
+  GEN --> RET
+  ING -. embed .-> Gemini
+  RET -. embed query .-> Gemini
+  GEN -. JSON schema .-> Gemini
+  GRD -. JSON schema .-> Gemini
 ```
 
-### Backend Setup
+1. **Upload**: the PDF goes to GridFS; the backend indexes it in the background. The RAG service
+   extracts text per page (keeping physical page numbers and printed labels like `xii` or `44`),
+   chunks it into exact character spans so every chunk knows its page range, embeds the chunks
+   (`gemini-embedding-001`, 768-d, normalised) and stores them in pgvector.
+2. **Generate**: the viewer sends the selected text and the pages it spans. The service retrieves the
+   matching chunks and asks Gemini, in JSON mode with a schema, for questions with a reference answer,
+   2–5 key points and the ids of the sources used. Citations are verified in code: a question that cites
+   a chunk it wasn't given is dropped.
+3. **Grade**: for each key point Gemini judges *covered / partial / missing*; the score and verdict are
+   computed from those judgements in code. Feedback cites pages, and "Review: p. 44" jumps the viewer there.
+
+## Design decisions
+
+- **pgvector, not a separate vector DB.** User/document/page filters and the vector search are one SQL
+  query; deleting a document deletes its chunks in the same transaction; full-text search sits next to
+  the vectors for hybrid retrieval; and the service holds no state of its own, so it can run as a
+  serverless function. Cost: a second database beside Mongo, with a clean boundary (app data vs. index).
+- **Page-level eval labels.** Retrieval labels are page numbers, not chunk ids, so one label set compares
+  chunk sizes, embedding models and retrieval modes.
+- **Decomposed grading.** Narrow per-point decisions are more consistent and explainable than a
+  holistic 0–100 number; the eval measures it against a human (κ 0.84 weighted vs 0.54 for the old grader).
+- **Nothing tuned on the test sets.** Labels and hand grades were committed before each first run; a
+  tempting threshold tweak was checked post hoc and rejected (no net gain).
+- **Built for flaky upstreams.** Embeddings are paced to the free tier's 100/min; LLM calls retry with the
+  server's `RetryInfo` delay and fall back to a second model when the first stays overloaded.
+- **Security boundary.** End users never reach the RAG service: the backend authenticates them (JWT) and
+  calls the service with a shared token and the verified user id; every query filters on that user.
+
+## Run it locally
+
+Needs Docker and a [Gemini API key](https://aistudio.google.com/apikey).
+
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/assessment-management-system.git
-
-# Install Node.js dependencies
-cd backend
-npm install
-
-# Install Python dependencies
-cd python
-pip install -r requirements.txt
-
-# Configure environment variables
-cp .env.example .env
-
-# Start development server
-npx nodemon server.js
+cp .env.example .env          # set GOOGLE_API_KEY
+docker compose up --build
 ```
 
-### Frontend Setup
+- App: http://localhost:3000 (register, upload a PDF, open it, select text, *Generate*)
+- API: http://localhost:8000/api/test
+- RAG service docs: http://localhost:8001/docs
+
+## Tests and evals
+
 ```bash
-# Navigate to frontend directory
-cd frontend
+# RAG service: unit + API tests (DB tests need Postgres with pgvector)
+docker compose -f compose.dev.yml up -d db
+docker compose -f compose.dev.yml exec db createdb -U rag rag_test   # tests drop and recreate their tables
+cd rag_service && pip install -r requirements-dev.txt
+TEST_DATABASE_URL=postgresql://rag:rag@localhost:5433/rag_test pytest
 
-# Install dependencies
-npm install
+# Backend
+cd backend && npm ci && npm test
 
-# Start development server
-npm start
+# Evals (real Gemini calls)
+evals/corpus/fetch_corpus.sh
+python evals/retrieval/run_retrieval_eval.py
+python evals/grading/run_grader_eval.py
 ```
+
+CI (`.github/workflows/ci.yml`) runs the Python tests against a pgvector service container, the backend
+tests, a production frontend build, and builds every Docker image.
+
+## Repository layout
+
+```
+frontend/       React app (PDF viewer with citations, practice, skill analysis, admin)
+backend/        Express API: auth, quizzes, grading router, RAG client, background indexer
+rag_service/    FastAPI: PDF ingestion, chunking, embeddings, pgvector store, grounded generation, grading
+evals/          retrieval and grader-agreement evals, labels, results
+docs/           screenshots
+```
+
+## Other features
+
+Folders and file management, timetable, break reminders, subject → topic → subtopic → concept
+analytics, Stripe premium plan, admin panel (users, notifications, settings).
 
 ## Configuration
-Create a `.env` file in the backend directory with the following variables:
-```
-MONGODB_URI=your_mongodb_connection_string
-JWT_SECRET=your_jwt_secret
-GOOGLE_DRIVE_API_KEY=your_google_drive_api_key
-GOOGLE_API_KEY=your_gemini_api_key
-```
 
-## API Documentation
-The API documentation is available at `/api/docs` when running the server locally. It includes:
-- Authentication endpoints
-- Question generation API
-- Answer evaluation endpoints
-- User management routes
-- Analytics endpoints
-
-## Database Schema
-Key collections in MongoDB:
-- Users
-- Questions
-- Answers
-- PerformanceMetrics
-- Subscriptions
-- TimeTable
-
-## Testing
-```bash
-# Run backend tests
-cd backend
-npm test
-
-# Run frontend tests
-cd frontend
-npm test
-```
-
-## Deployment
-### Docker Deployment
-```bash
-# Build images
-docker-compose build
-
-# Start services
-docker-compose up
-```
-
-### Manual Deployment
-1. Set up a MongoDB instance
-2. Deploy the Python AI service
-3. Deploy the Node.js backend
-4. Deploy the React frontend
-5. Configure nginx for routing
-
-## Contributing
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
-
-## License
-This project is licensed under the MIT License - see the LICENSE.md file for details.
-
-## Support
-For support, email sabha341781@gmail.com or create an issue in the repository.
+See `backend/.env.example`, `rag_service/README.md` and `.env.example` (Docker). The RAG path is
+off unless `RAG_ENABLED=true`; without it the app falls back to the earlier, ungrounded generator.
