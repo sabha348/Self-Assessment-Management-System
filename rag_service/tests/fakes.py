@@ -32,3 +32,18 @@ class KeywordEmbedder:
 
     def embed_query(self, text):
         return l2_normalize(self._vec(text)[None, :])[0]
+
+
+class ScriptedLLM:
+    """Returns pre-set outputs per schema name; records prompts."""
+
+    name = "scripted"
+
+    def __init__(self, outputs: dict):
+        self.outputs = outputs  # schema class name -> dict or callable(prompt) -> dict
+        self.prompts = []
+
+    def generate_json(self, prompt, schema, temperature=0.2):
+        self.prompts.append(prompt)
+        out = self.outputs[schema.__name__]
+        return schema.model_validate(out(prompt) if callable(out) else out)

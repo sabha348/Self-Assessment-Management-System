@@ -3,6 +3,8 @@ const Document = require('../models/Document');
 const { GridFSBucket } = require('mongodb');
 const mongoose = require('mongoose');
 const stream = require('stream');
+const { getIndexer } = require('./ragIndexer');
+const { ragClient } = require('../utils/ragClient');
 
 // Configure multer to store in memory instead of disk
 const storage = multer.memoryStorage();
@@ -49,11 +51,20 @@ const uploadFile = async (req, res) => {
       });
       
       await docRef.save();
-      
+
+      // Index for grounded questions in the background (minutes for a long PDF).
+      let ragStatus = 'none';
+      try {
+        if (await getIndexer().scheduleIndex(docRef._id)) ragStatus = 'pending';
+      } catch (e) {
+        console.error('Could not schedule RAG indexing:', e.message);
+      }
+
       res.status(200).json({
         message: 'File uploaded successfully',
         _id: docRef._id,
-        title: docRef.title
+        title: docRef.title,
+        ragStatus
       });
     });
     
@@ -159,6 +170,15 @@ const deleteFile = async (req, res) => {
       }
     }
     
+    // Remove its chunks and embeddings from the RAG index too.
+    if (ragClient.isEnabled()) {
+      try {
+        await ragClient.deleteDocument({ documentId: file._id, userId: file.uploadedBy });
+      } catch (ragError) {
+        console.error('Error deleting from RAG index:', ragError.message);
+      }
+    }
+
     // Then delete the document reference
     await Document.findByIdAndDelete(id);
     

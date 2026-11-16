@@ -8,6 +8,8 @@ const mongoose = require("mongoose");
 // Import the text categorizer
 const { categorizeText } = require("../utils/TextCategory");
 const { authenticateToken } = require("../middleware/authenticate");
+const { getGrader } = require("../services/grading");
+const { getGroundedQuiz } = require("../services/groundedQuiz");
 
 // Every quiz route acts on behalf of the logged-in user. The user id comes
 // from the verified JWT, never from the request body or URL.
@@ -26,6 +28,20 @@ router.post("/", async (req, res) => {
       subject = "Knowledge",
     } = req.body;
     const userId = req.user.userId;
+
+    // Grounded path: questions only from the user's indexed PDF, with page citations.
+    let indexing = false;
+    try {
+      const grounded = await getGroundedQuiz().tryGenerate({ userId, body: req.body });
+      if (grounded.handled) return res.json(grounded.body);
+      indexing = Boolean(grounded.indexing);
+    } catch (err) {
+      if (err.status === 404 || err.status === 422) {
+        return res.status(err.status).json({ error: err.message });
+      }
+      // RAG service down: fall back to the legacy generator rather than failing.
+      console.error("Grounded generation failed, using legacy path:", err.message);
+    }
 
     if (!text || typeof text !== "string") {
       return res.status(400).json({ error: "Valid text input is required" });
@@ -90,6 +106,8 @@ router.post("/", async (req, res) => {
       res.json({
         quizId,
         questions: questionsArray,
+        grounded: false,
+        indexing, // true while this PDF is being indexed for grounded questions
       });
 
       try {
@@ -333,7 +351,7 @@ router.post("/:quizId/submit", async (req, res) => {
     // Check if we have correct answers in the database, and if not, generate them on-demand
     let missingCorrectAnswers = false;
     const questionsWithoutAnswers = questions.filter(
-      (q) => !q.correctAnswer || q.correctAnswer === "Unable to generate answer"
+      (q) => !q.grounded && (!q.correctAnswer || q.correctAnswer === "Unable to generate answer")
     );
 
     if (questionsWithoutAnswers.length > 0) {
@@ -389,84 +407,63 @@ router.post("/:quizId/submit", async (req, res) => {
       }
     }
 
-    // Now match the questions with answers
+    // Pair each answered question with its answer (by position, not by
+    // question text, which breaks when two questions share the same wording).
+    const items = [];
     questions.forEach((question, index) => {
-      if (answersArray[index]) {
-        questionsData.push(question.question);
-        userAnswersData.push(answersArray[index]);
-        correctAnswersData.push(
-          question.correctAnswer || "No answer available"
-        );
-      }
+      if (answersArray[index]) items.push({ question, userAnswer: answersArray[index] });
     });
-
-    // Prepare evaluation data
-    const evalData = {
-      answers: userAnswersData,
-      correct_answers: correctAnswersData,
-    };
+    if (!items.length) {
+      return res.status(400).json({ error: "No answers to grade" });
+    }
 
     try {
-      const results = await runPythonProcess(
-        "./python_scripts/evaluate_answers.py",
-        [JSON.stringify(evalData)]
-      );
+      const evaluations = await getGrader().grade(userId, items);
 
-      // Store user answers and evaluation results
-      const userAnswerPromises = [];
       let totalScore = 0;
-
-      for (let i = 0; i < results.evaluations.length; i++) {
-        const evaluation = results.evaluations[i];
-        const question = questions.find((q) => q.question === questionsData[i]);
-
-        if (question) {
-          const userAnswer = new UserAnswer({
+      await Promise.all(
+        evaluations.map((evaluation, i) => {
+          if (evaluation.is_correct) totalScore += 1;
+          return new UserAnswer({
             userId,
-            questionId: question.questionId,
+            questionId: items[i].question.questionId,
             userAnswer: evaluation.user_answer,
             accuracy: evaluation.accuracy,
             quizId,
             missingPoint: evaluation.missing_points || [],
             isCorrect: evaluation.is_correct,
+            verdict: evaluation.verdict,
+            feedback: evaluation.feedback || undefined,
+            graderVersion: evaluation.grader,
             timeTaken: timeTaken ? timeTaken / questions.length : null, // Approximate time per question
-          });
+          }).save();
+        })
+      );
 
-          userAnswerPromises.push(userAnswer.save());
-          if (evaluation.is_correct) {
-            totalScore += 1;
-          }
-        }
-      }
-
-      // Update quiz with user completion time
       if (timeTaken) {
         quiz.userTime = timeTaken;
         await quiz.save();
       }
 
-      // Wait for all user answers to be saved
-      await Promise.all(userAnswerPromises);
-
-      // Results should already be parsed JSON from pythonRunner
-      const formattedResults = results.evaluations.map((evaluation, index) => ({
-        questionId: questions.find((q) => q.question === questionsData[index])
-          ?.questionId,
-        status: evaluation.is_correct ? "correct" : "wrong",
-        accuracy: evaluation.accuracy,
-        user_answer: evaluation.user_answer,
-        correct_answer: evaluation.correct_answer,
-        question: questionsData[index],
-        missing_points: evaluation.missing_points || [],
-      }));
-
       res.json({
-        evaluations: formattedResults,
-        totalScore: results.totalScore || totalScore / questionsData.length,
+        evaluations: evaluations.map((evaluation, i) => ({
+          questionId: items[i].question.questionId,
+          status: evaluation.is_correct ? "correct" : "wrong",
+          verdict: evaluation.verdict,
+          accuracy: evaluation.accuracy,
+          user_answer: evaluation.user_answer,
+          correct_answer: evaluation.correct_answer,
+          question: items[i].question.question,
+          missing_points: evaluation.missing_points || [],
+          feedback: evaluation.feedback,
+          citations: evaluation.citations || [],
+          grounded: evaluation.grader === "rag-points-v1",
+        })),
+        totalScore,
       });
     } catch (error) {
       console.error("Error evaluating answers:", error);
-      res.status(500).json({
+      res.status(502).json({
         error: "Evaluation process failed",
         details: error.message,
       });

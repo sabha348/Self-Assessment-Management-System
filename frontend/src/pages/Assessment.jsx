@@ -9,6 +9,7 @@ import {
   Divider, Card, CardContent, Chip, Alert, CircularProgress, IconButton
 } from '@mui/material';
 import FlagIcon from '@mui/icons-material/Flag';
+import { CitationChips, stripMarkdown } from '../components/Citations';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 // Temporary Timer component until you create one
@@ -78,8 +79,9 @@ const ResultsDisplay = ({ results, onFinish }) => (
             p: 2, 
             mb: 2, 
             borderLeft: '4px solid',
-            borderColor: evaluation.status === 'correct' ? 'success.main' : 
-                          evaluation.status === 'unanswered' ? 'grey.500' : 'error.main'
+            borderColor: evaluation.status === 'correct' ? 'success.main' :
+                          evaluation.status === 'unanswered' ? 'grey.500' :
+                          evaluation.verdict === 'partial' ? 'warning.main' : 'error.main'
           }}
         >
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -114,7 +116,7 @@ const ResultsDisplay = ({ results, onFinish }) => (
                   Correct answer:
                 </Typography>
                 <Typography variant="body2" color="success.main">
-                  {evaluation.correct_answer}
+                  {stripMarkdown(evaluation.correct_answer)}
                 </Typography>
                 
                 {evaluation.missing_points && evaluation.missing_points.length > 0 && (
@@ -130,6 +132,14 @@ const ResultsDisplay = ({ results, onFinish }) => (
                   </Box>
                 )}
               </>
+            )}
+            {evaluation.feedback && (
+              <Typography variant="body2" sx={{ mt: 1 }}>{evaluation.feedback}</Typography>
+            )}
+            {evaluation.citations?.length > 0 && (
+              <Box sx={{ mt: 1 }}>
+                <CitationChips citations={evaluation.citations} label="Review in your PDF" />
+              </Box>
             )}
           </Box>
         </Paper>

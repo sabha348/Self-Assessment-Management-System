@@ -12,6 +12,9 @@ const useranswerSchema = new Schema({
     AnsweredAt: { type: Date, default: Date.now },
     missingPoint: { type: [String] }, // Explanation of missing points in user's answer
     isCorrect: { type: Boolean }, // Whether the answer is correct or not
+    verdict: { type: String, enum: ['correct', 'partial', 'incorrect'] }, // grounded grading
+    feedback: { type: String },
+    graderVersion: { type: String }, // 'rag-points-v1' or 'legacy-gemini
 });
 
 module.exports = mongoose.model('UserAnswer', useranswerSchema);

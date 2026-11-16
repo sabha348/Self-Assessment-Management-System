@@ -7,6 +7,7 @@ import { defaultLayoutPlugin } from '@react-pdf-viewer/default-layout';
 import { thumbnailPlugin } from '@react-pdf-viewer/thumbnail';
 import { jwtDecode } from 'jwt-decode';
 import Joyride from 'react-joyride'; // Make sure this import is included
+import { CitationChips, VerdictBadge, stripMarkdown, verdictStyle } from '../components/Citations';
 
 // Import styles
 import '@react-pdf-viewer/core/lib/styles/index.css';
@@ -21,7 +22,36 @@ const PdfViewer = () => {
   const decodedToken = token ? jwtDecode(token) : null;
   const userId = decodedToken?.userId; // or .id or ._id depending on your token
   const navigate = useNavigate();
-  const { pdfData, title, userId: locationUserId} = location.state || {};
+  const { pdfData, title, documentId } = location.state || {};
+  // Grounded questions: page tracking and per-question citations
+  // 0-based page from the viewer. A ref, so the 5-minute auto-generation
+  // callback reads the latest page without being re-created on every scroll.
+  const currentPageRef = useRef(0);
+  const [selectedPages, setSelectedPages] = useState(null); // {start, end}, 1-based
+  const [questionMeta, setQuestionMeta] = useState([]); // [{questionId, citations}]
+  const [ragStatus, setRagStatus] = useState(null);
+
+  // Poll the indexing status while the PDF is being indexed for grounded questions.
+  useEffect(() => {
+    if (!documentId) return undefined;
+    let cancelled = false;
+    let timer;
+    const poll = async () => {
+      try {
+        const { data } = await axios.get(`${API_URL}/files/${documentId}/rag-status`);
+        if (cancelled) return;
+        setRagStatus(data);
+        if (data.enabled && ['pending', 'processing'].includes(data.status)) timer = setTimeout(poll, 5000);
+      } catch (e) {
+        // Status is informational only; ignore errors.
+      }
+    };
+    poll();
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [documentId]);
   const [selectedText, setSelectedText] = useState('');
   const [buttonPosition, setButtonPosition] = useState({ x: 0, y: 0 });
   const [showButton, setShowButton] = useState(false);
@@ -176,6 +206,16 @@ const [isProcessingResults, setIsProcessingResults] = useState(false);
           y: Math.max(rect.top + window.scrollY - 60, 70) // Ensure button doesn't go above header
         });
         setSelectedText(text);
+        // Which PDF pages the selection spans (physical, 1-based), so the
+        // backend can retrieve from those pages.
+        const pageOf = (node) => {
+          const el = (node.nodeType === 3 ? node.parentElement : node)?.closest('[data-testid^="core__page-layer-"]');
+          const n = el ? parseInt(el.getAttribute('data-testid').split('-').pop(), 10) : NaN;
+          return Number.isNaN(n) ? null : n + 1;
+        };
+        const a = pageOf(range.startContainer);
+        const b = pageOf(range.endContainer);
+        setSelectedPages(a && b ? { start: Math.min(a, b), end: Math.max(a, b) } : null);
         setShowButton(true);
       }
     };
@@ -269,8 +309,10 @@ const [isProcessingResults, setIsProcessingResults] = useState(false);
 
       const response = await axios.post(`${API_URL}/quizzes`, {
         text: selectedText,
+        documentId,
+        pageStart: selectedPages?.start,
+        pageEnd: selectedPages?.end,
         numQuestions: questionSettings.numQuestions,
-        userId: userId,
         topic: 'General',
         subject: 'Knowledge',
         type: questionType,
@@ -287,7 +329,10 @@ const [isProcessingResults, setIsProcessingResults] = useState(false);
       // Get the quizId directly from response
     const quizIdentifier = response.data.quizId;
     
-      
+      setQuestionMeta(response.data.questionDetails || []);
+      if (response.data.indexing) {
+        toast('This PDF is still being indexed, so these questions have no page citations yet.', { icon: 'ℹ️' });
+      }
       setQuestions(response.data.questions);
       setQuizId(quizIdentifier);
       setShowQuestions(true);
@@ -331,7 +376,7 @@ const [isProcessingResults, setIsProcessingResults] = useState(false);
       // Make sure to reset the timer paused state on error
       setIsTimerPaused(false);
     }
-}, [userId, questionConfig, selectedText,autoSubmissionTimer]);
+}, [userId, questionConfig, selectedText, autoSubmissionTimer, documentId, selectedPages]);
 
   // Function to get text content up to current scroll position
   // Convert getVisibleText to a memoized function with useCallback
@@ -436,8 +481,11 @@ const handleAutoSubmission = useCallback(async () => {
 
       const response = await axios.post(`${API_URL}/quizzes`, {
         text: newText,
+        documentId,
+        // The pages around where the reader is now (physical, 1-based).
+        pageStart: Math.max(1, currentPageRef.current),
+        pageEnd: currentPageRef.current + 2,
         numQuestions: questionSettings.numQuestions,
-        userId: userId,
         subject: 'Knowledge',
         type: questionType,
         difficulty: questionSettings.difficulty,
@@ -463,6 +511,7 @@ const handleAutoSubmission = useCallback(async () => {
       // Get quizId directly from response
       const quizIdentifier = response.data.quizId;
       
+      setQuestionMeta(response.data.questionDetails || []);
       setQuestions(response.data.questions);
       setQuizId(quizIdentifier);
       setShowQuestions(true);
@@ -493,7 +542,7 @@ const handleAutoSubmission = useCallback(async () => {
       maxAllowed: TEXT_LIMITS.MAX_CHARS
     });
   }
-}, [getVisibleText, lastReadPosition, userId, TEXT_LIMITS.MIN_CHARS, TEXT_LIMITS.MAX_CHARS, questionConfig, isTimerPaused, showQuestions, showResults]);
+}, [getVisibleText, lastReadPosition, userId, TEXT_LIMITS.MIN_CHARS, TEXT_LIMITS.MAX_CHARS, questionConfig, isTimerPaused, showQuestions, showResults, documentId]);
 
 
   // Resume timer when questions are closed
@@ -667,6 +716,13 @@ const handleSubmitAnswers = useCallback(async (isTimeUp = false, explicitQuizId 
 }, [quizId, userId, questions, answers, startTime, clearQuizTimer, checkForBreakNotification, remainingTime]);
 
   // Resume timer when results are closed
+  // Close the results and take the reader to the cited page (1-based physical page).
+  const jumpToCitation = (page) => {
+    handleCloseResults();
+    const nav = defaultLayoutPluginInstance.toolbarPluginInstance.pageNavigationPluginInstance;
+    setTimeout(() => nav.jumpToPage(Math.max(0, page - 1)), 0);
+  };
+
   const handleCloseResults = () => {
     setShowResults(false);
     setEvaluationResults(null);
@@ -1132,6 +1188,11 @@ useEffect(() => {
                           {question}
                         </p>
                       </div>
+                      {questionMeta[index]?.citations?.length > 0 && (
+                        <div className="ml-6">
+                          <CitationChips citations={questionMeta[index].citations} label="From" />
+                        </div>
+                      )}
                       
                       {selectedQuestion === index && (
                         <div 
@@ -1223,24 +1284,12 @@ useEffect(() => {
                 {evaluationResults.evaluations.map((result, index) => (
                   <div 
                     key={index}
-                    className={`p-4 rounded-lg border ${
-                      result.status === 'correct' 
-                        ? 'bg-green-50 border-green-200' 
-                        : 'bg-red-50 border-red-200'
-                    }`}
+                    className={`p-4 rounded-lg border ${verdictStyle(result).box}`}
                   >
                     <div className="space-y-3">
                       <div className="flex justify-between items-start">
                         <span className="font-medium text-gray-700">Question {index + 1}</span>
-                        <span className={`px-2 py-1 rounded-full text-sm ${
-                          result.status === 'correct'
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-red-100 text-red-800'
-                        }`}>
-                          {result.status === 'correct' 
-                            ? `Correct (accuracy: ${result.accuracy}%)` 
-                            : `Incorrect (accuracy: ${result.accuracy}%)`}
-                        </span>
+                        <VerdictBadge result={result} />
                       </div>
                       
                       
@@ -1257,16 +1306,25 @@ useEffect(() => {
                           <>
                             <div>
                               <p className="text-sm text-gray-500">Correct Answer:</p>
-                              <p className="text-gray-700">{result.correct_answer}</p>
+                              <p className="text-gray-700">{stripMarkdown(result.correct_answer)}</p>
                             </div>
+                            {result.feedback && (
+                              <div>
+                                <p className="text-sm text-gray-500">Feedback:</p>
+                                <p className="text-gray-700">{result.feedback}</p>
+                              </div>
+                            )}
+                            {result.missing_points?.length > 0 && (
                             <div>
                               <p className="text-sm text-gray-500">Missing Points:</p>
                               <ul className="list-disc list-inside text-gray-700">
                                 {result.missing_points.map((point, i) => (
-                                  <li key={i}>{point}</li>
+                                  <li key={i}>{stripMarkdown(point)}</li>
                                 ))}
                               </ul>
                             </div>
+                            )}
+                            <CitationChips citations={result.citations} label="Review" onJump={jumpToCitation} />
                           </>
                       </div>
                     </div>
@@ -1290,6 +1348,21 @@ useEffect(() => {
       <div className="max-w-6xl mx-auto">
          <div className="bg-white rounded-lg shadow-sm p-4 mb-4 flex justify-between items-center sticky top-0 z-10">
           <h1 className="text-xl font-semibold">{title || 'PDF Viewer'}</h1>
+          {ragStatus?.enabled && ragStatus.status !== 'none' && (
+            <span
+              data-testid="rag-status"
+              title={ragStatus.error || ''}
+              className={`ml-3 px-2 py-0.5 rounded-full text-xs ${
+                ragStatus.status === 'ready' ? 'bg-green-100 text-green-800'
+                  : ragStatus.status === 'failed' ? 'bg-red-100 text-red-800'
+                  : 'bg-amber-100 text-amber-800'
+              }`}
+            >
+              {ragStatus.status === 'ready' ? 'Cited questions ready'
+                : ragStatus.status === 'failed' ? 'Indexing failed'
+                : 'Indexing for cited questions…'}
+            </span>
+          )}
           <div className="flex space-x-4">
             <button 
               onClick={() => navigate('/dashboard')}
@@ -1342,6 +1415,7 @@ useEffect(() => {
               theme={{
                 theme: 'light',
               }}
+              onPageChange={(e) => { currentPageRef.current = e.currentPage; }}
               onDocumentLoad={() => {
                 // Handle document load
               }}

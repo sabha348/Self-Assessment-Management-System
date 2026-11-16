@@ -17,7 +17,24 @@ const questionSchema = new Schema({
   subtopic: { type: String },
   concept: { type: String },
   difficulty: { type: String },
-  userId: { type: Schema.Types.ObjectId, ref: 'User' }
+  userId: { type: Schema.Types.ObjectId, ref: 'User' },
+  // Grounded (RAG) questions: generated only from retrieved chunks of a document.
+  grounded: { type: Boolean, default: false },
+  documentId: { type: Schema.Types.ObjectId, ref: 'Document' },
+  keyPoints: { type: [String], default: undefined },
+  sourceChunkIds: { type: [String], default: undefined },
+  citations: {
+    type: [{
+      _id: false,
+      chunkId: String,
+      pageStart: Number,
+      pageEnd: Number,
+      pageLabelStart: String,
+      pageLabelEnd: String,
+      snippet: String
+    }],
+    default: undefined
+  }
 });
 
 // Pre-save middleware to automatically populate hierarchical fields from Quiz

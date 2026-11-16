@@ -51,9 +51,7 @@ def chunk_id(document_id: str, chunk: Chunk) -> str:
     return h.hexdigest()[:32]
 
 
-_HIT_COLUMNS = (
-    "id AS chunk_id, document_id, chunk_index, page_start, page_end, page_label_start, page_label_end, text"
-)
+_HIT_COLUMNS = "id AS chunk_id, document_id, chunk_index, page_start, page_end, page_label_start, page_label_end, text"
 
 
 def _where(f: SearchFilters) -> tuple[str, list]:
@@ -139,9 +137,19 @@ class ChunkStore:
 
     def count_chunks(self, document_id: str) -> int:
         with self.pool.connection() as conn:
-            return conn.execute(
-                "SELECT count(*) FROM chunks WHERE document_id = %s", (document_id,)
-            ).fetchone()[0]
+            return conn.execute("SELECT count(*) FROM chunks WHERE document_id = %s", (document_id,)).fetchone()[0]
+
+    def get_chunks(self, chunk_ids: Sequence[str], user_id: str) -> list[Hit]:
+        """Chunks by id, in the order asked, only if they belong to user_id."""
+        if not chunk_ids:
+            return []
+        with self.pool.connection() as conn, conn.cursor(row_factory=dict_row) as cur:
+            rows = cur.execute(
+                f"SELECT {_HIT_COLUMNS}, 1.0 AS score FROM chunks WHERE id = ANY(%s) AND user_id = %s",
+                (list(chunk_ids), user_id),
+            ).fetchall()
+        by_id = {r["chunk_id"]: Hit(**r) for r in rows}
+        return [by_id[c] for c in dict.fromkeys(chunk_ids) if c in by_id]
 
     # -- search ------------------------------------------------------------
 

@@ -249,6 +249,7 @@ const FilesList = () => {
       state: {
         pdfData: pdfUrl,
         title: title,
+        documentId: fileId,
         questionConfig: questionConfig,
       },
     });
@@ -809,6 +810,21 @@ const FilesList = () => {
                               >
                                 {file.title || "Untitled Document"}
                               </Typography>
+                              {["pending", "processing", "ready", "failed"].includes(file.ragStatus) && (
+                                <span
+                                  data-testid="file-rag-status"
+                                  title={file.ragError || ""}
+                                  className={`ml-1 mr-1 shrink-0 px-2 py-0.5 rounded-full text-xs ${
+                                    file.ragStatus === "ready"
+                                      ? "bg-green-100 text-green-800"
+                                      : file.ragStatus === "failed"
+                                      ? "bg-red-100 text-red-800"
+                                      : "bg-amber-100 text-amber-800"
+                                  }`}
+                                >
+                                  {file.ragStatus === "ready" ? "Indexed" : file.ragStatus === "failed" ? "Index failed" : "Indexing…"}
+                                </span>
+                              )}
                               <div className="flex">
                                 <IconButton
                                   size="small"

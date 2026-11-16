@@ -1,4 +1,8 @@
+import logging
+import time
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
+from dataclasses import asdict
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile, status
@@ -9,7 +13,9 @@ from . import __version__
 from .auth import require_service_token
 from .config import Settings, get_settings
 from .embeddings import Embedder, EmbeddingError, build_embedder
+from .grounded import Difficulty, generate_questions, grade_answer
 from .ingest import OwnershipError, ingest_pdf
+from .llm import LLM, LLMError, build_llm
 from .pdf import PdfError
 from .retrieval import Mode, retrieve
 from .store import ChunkStore, SearchFilters
@@ -24,6 +30,7 @@ async def lifespan(app: FastAPI):
     pool = make_pool(settings.database_url)
     app.state.store = ChunkStore(pool)
     app.state.embedder = build_embedder(settings)
+    app.state.llm = build_llm(settings)
     try:
         yield
     finally:
@@ -38,10 +45,29 @@ app = FastAPI(
 )
 
 
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+log = logging.getLogger("rag")
+
+
+@app.middleware("http")
+async def _timing(request: Request, call_next):
+    started = time.monotonic()
+    response = await call_next(request)
+    if request.url.path != "/health":
+        elapsed = time.monotonic() - started
+        log.info("%s %s -> %d in %.2fs", request.method, request.url.path, response.status_code, elapsed)
+    return response
+
+
 @app.exception_handler(EmbeddingError)
 def _embedding_failed(request: Request, exc: EmbeddingError) -> JSONResponse:
     # Upstream dependency failed: 502, not a generic 500, and no stack trace.
     return JSONResponse(status_code=502, content={"detail": f"embedding provider unavailable: {exc}"})
+
+
+@app.exception_handler(LLMError)
+def _llm_failed(request: Request, exc: LLMError) -> JSONResponse:
+    return JSONResponse(status_code=502, content={"detail": f"LLM provider unavailable: {exc}"})
 
 
 def get_store(request: Request) -> ChunkStore:
@@ -50,6 +76,10 @@ def get_store(request: Request) -> ChunkStore:
 
 def get_embedder(request: Request) -> Embedder:
     return request.app.state.embedder
+
+
+def get_llm(request: Request) -> LLM:
+    return request.app.state.llm
 
 
 Authed = Depends(require_service_token)
@@ -166,3 +196,116 @@ def retrieve_chunks(
         mode=body.mode,
     )
     return RetrieveResponse(query=body.query, mode=body.mode, chunks=[ChunkOut(**h.__dict__) for h in hits])
+
+
+# -- grounded generation and grading --------------------------------------------
+
+
+class CitationOut(BaseModel):
+    chunk_id: str
+    page_start: int
+    page_end: int
+    page_label_start: str
+    page_label_end: str
+    snippet: str
+
+
+class QuestionsRequest(BaseModel):
+    user_id: str = Field(min_length=1)
+    document_id: str = Field(min_length=1)
+    n: int = Field(default=5, ge=1)
+    difficulty: Difficulty = Difficulty.medium
+    focus_text: str | None = Field(default=None, max_length=8000)
+    page_min: int | None = Field(default=None, ge=1)
+    page_max: int | None = Field(default=None, ge=1)
+
+
+class QuestionOut(BaseModel):
+    question: str
+    reference_answer: str
+    key_points: list[str]
+    citations: list[CitationOut]
+
+
+class QuestionsResponse(BaseModel):
+    questions: list[QuestionOut]
+    insufficient_context: bool
+    dropped: int
+    retrieved: list[CitationOut]
+
+
+@app.post("/v1/questions", response_model=QuestionsResponse, dependencies=[Authed])
+def create_questions(
+    body: QuestionsRequest,
+    settings: Settings = Depends(get_settings),
+    store: ChunkStore = Depends(get_store),
+    embedder: Embedder = Depends(get_embedder),
+    llm: LLM = Depends(get_llm),
+):
+    doc = store.get_document(body.document_id)
+    if not doc or doc.user_id != body.user_id:
+        raise HTTPException(status.HTTP_409_CONFLICT, "document is not indexed yet")
+    n = min(body.n, settings.max_questions)
+    filters = SearchFilters(body.user_id, [body.document_id], body.page_min, body.page_max)
+    focus = (body.focus_text or "").strip() or None
+    query = focus[:2000] if focus else "key concepts, definitions and explanations"
+    hits = retrieve(store=store, embedder=embedder, query=query, filters=filters, k=max(6, n + 2))
+    if not hits and (body.page_min or body.page_max):
+        # The visible pages may be blank (cover, figures): fall back to the whole document.
+        hits = retrieve(
+            store=store, embedder=embedder, query=query, k=max(6, n + 2),
+            filters=SearchFilters(body.user_id, [body.document_id]),
+        )  # fmt: skip
+    result = generate_questions(llm, hits, n=n, difficulty=body.difficulty.value, focus=focus)
+    return QuestionsResponse(
+        questions=[QuestionOut(**asdict(q)) for q in result.questions],
+        insufficient_context=result.insufficient_context,
+        dropped=result.dropped,
+        retrieved=[CitationOut(**asdict(c)) for c in result.retrieved],
+    )
+
+
+class GradeItem(BaseModel):
+    question: str = Field(min_length=1, max_length=4000)
+    reference_answer: str = Field(min_length=1, max_length=8000)
+    key_points: list[str] = Field(default_factory=list, max_length=10)
+    source_chunk_ids: list[str] = Field(min_length=1, max_length=10)
+    answer: str = Field(default="", max_length=8000)
+
+
+class GradeRequest(BaseModel):
+    user_id: str = Field(min_length=1)
+    items: list[GradeItem] = Field(min_length=1, max_length=20)
+
+
+class GradeOut(BaseModel):
+    verdict: str
+    score: int
+    point_status: list[str]
+    missing_points: list[str]
+    feedback: str
+    citations: list[CitationOut]
+
+
+class GradeResponse(BaseModel):
+    results: list[GradeOut]
+
+
+@app.post("/v1/grade", response_model=GradeResponse, dependencies=[Authed])
+def grade(
+    body: GradeRequest,
+    settings: Settings = Depends(get_settings),
+    store: ChunkStore = Depends(get_store),
+    llm: LLM = Depends(get_llm),
+):
+    def one(item: GradeItem):
+        hits = store.get_chunks(item.source_chunk_ids, body.user_id)
+        if not hits:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "source chunks not found for this user")
+        return grade_answer(llm, item.question, item.reference_answer, item.key_points, hits, item.answer)
+
+    # Answers are graded independently (one call each) so one answer can't
+    # influence another's grade; run them in parallel to keep latency down.
+    with ThreadPoolExecutor(max_workers=settings.grade_concurrency) as pool:
+        results = list(pool.map(one, body.items))
+    return GradeResponse(results=[GradeOut(**asdict(r)) for r in results])
