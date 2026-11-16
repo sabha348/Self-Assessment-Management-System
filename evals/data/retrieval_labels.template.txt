@@ -1,0 +1,10 @@
+# Retrieval labels for Think Python 2e (evals/corpus/thinkpython2.pdf).
+# Copy this file to retrieval_labels.txt and add one question per line:
+#
+#   <page numbers> | <question> | <optional tags, comma-separated>
+#
+# Page numbers are PHYSICAL pages: the "page N of 244" counter in your PDF
+# viewer, not the number printed at the bottom of the page.
+# List every page that contains the answer (usually 1, sometimes 2).
+#
+# Lines starting with # are ignored.

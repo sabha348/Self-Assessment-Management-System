@@ -1,0 +1,54 @@
+# Retrieval labels for Think Python 2e (evals/corpus/thinkpython2.pdf, 244 pages).
+#
+# Authorship: written by Claude (Anthropic), at the project owner's request,
+# from the book's extracted page text. Gold pages were checked by locating the
+# answer passage on each page. The questions were written and committed
+# BEFORE any retrieval run (see git history), so they are not tuned to the
+# system. Neither the retriever (Gemini embeddings / Postgres FTS) nor the
+# label author saw the other's output. Tags: paraphrase = asked in different
+# words than the book; exact-term = uses the book's term or a Python name;
+# concept = "why"/"how" understanding; multi-page = answer spans two pages.
+#
+# Format: <physical page numbers> | <question> | <tags>
+26 | Why does typing 1,000,000 in Python not give you the number one million? | exact-term
+27 | What are the two kinds of syntax rules that a formal language has? | concept
+34 | Without parentheses, in what order does Python work out powers, multiplication and addition? | paraphrase
+44 | If I create a variable inside a function, can I still use it after the function has finished? | paraphrase
+46 | What happens to the result when a script calls math.sqrt on a line by itself without saving it? | concept
+62 | Is True a string in Python, and what type does it belong to? | exact-term
+66, 67 | My recursive function never reaches its stopping condition. What error does Python eventually report? | paraphrase,multi-page
+67 | How can a program read text that the user types on the keyboard? | paraphrase
+74 | What is dead code? | exact-term
+79 | Instead of tracing every recursive call by hand, what mental shortcut does the author recommend? | paraphrase
+80 | Why does calling factorial with 1.5 recurse forever, and how can the function guard against it? | concept
+87 | What makes a while loop eventually stop, and what is it called when it never stops? | concept
+88 | How do I leave a loop in the middle of its body as soon as the user types a certain word? | paraphrase
+96 | Why do I get an error when I try to change one character of a string by its index? | paraphrase
+98 | How do you search for a piece of text inside a string starting from a particular position? | paraphrase
+99 | Why does the word Pineapple sort before banana when comparing strings? | concept
+108 | How can you check that the letters of a word are in alphabetical order using a while loop over indices? | concept
+115 | What does it mean for an operation to be a reduce, and which built-in function reduces a list of numbers to their total? | exact-term
+117 | How do I break a sentence into a list of words, and how do I glue the words back together? | paraphrase
+118 | What is the difference between two lists being equivalent and being identical? | concept
+118, 119 | If two variable names point to the same list and I change it through one name, what happens to the other name? | paraphrase,multi-page
+119 | When a function deletes an element from a list it was given, does the caller see the change? | concept
+126 | Does the in operator check the keys or the values of a dictionary? | exact-term
+127 | How can I look up a key in a dictionary and get a fallback value instead of an error when the key is missing? | paraphrase
+131 | How can remembering results that were already computed make the recursive Fibonacci function faster? | paraphrase
+132, 133 | Why do I get UnboundLocalError when a function tries to update a variable that was defined outside it? | exact-term,multi-page
+138 | How does Python decide whether one tuple is less than another? | concept
+140 | How do you write a function that accepts any number of arguments? | paraphrase
+151 | How do you give a function parameter a default value, and where must such parameters appear? | concept
+162, 163 | How do I stop my program from crashing when it tries to open a file that does not exist? | paraphrase,multi-page
+164 | How can you store a list in a dbm database when dbm only accepts strings and bytes? | concept
+174 | What is the difference between a shallow copy and a deep copy of an object? | exact-term
+178 | What makes a function pure? | exact-term
+180 | What are the drawbacks of the prototype and patch approach compared with designed development? | concept
+187 | Which special method controls what appears when you print an object of your own class? | paraphrase
+189 | Why does 1337 + start fail when start is a Time object, and how is it fixed? | exact-term
+198 | How do you define a new class that reuses the methods of an existing class? | paraphrase
+206 | What is a shorter way to build a new list by applying an operation to every element of another list? | paraphrase
+209 | How can you check whether a list contains any repeated items in a single line? | paraphrase
+217, 218 | My program seems to hang and never finishes. How should I go about debugging it? | paraphrase,multi-page
+223, 224 | Why do we compare algorithms by how their run time grows with input size rather than by timing them? | concept
+228 | Which operations must a map support, in the walk-through that builds up to a hashtable? | concept

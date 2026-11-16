@@ -1,0 +1,56 @@
+{
+  "run_at": "2026-11-16T14:50:33+00:00",
+  "n_questions": 42,
+  "embedding_model": "gemini-embedding-001@768",
+  "chunk_size": 1500,
+  "chunk_overlap": 200,
+  "modes": {
+    "dense": {
+      "recall@1": 0.81,
+      "recall@3": 0.976,
+      "recall@5": 1.0,
+      "recall@10": 1.0,
+      "mrr@5": 0.895
+    },
+    "keyword": {
+      "recall@1": 0.238,
+      "recall@3": 0.548,
+      "recall@5": 0.738,
+      "recall@10": 0.857,
+      "mrr@5": 0.424
+    },
+    "hybrid": {
+      "recall@1": 0.619,
+      "recall@3": 0.881,
+      "recall@5": 0.905,
+      "recall@10": 0.976,
+      "mrr@5": 0.752
+    }
+  },
+  "by_tag": {
+    "concept": {
+      "n": 14,
+      "dense recall@5": 1.0,
+      "keyword recall@5": 0.786,
+      "hybrid recall@5": 1.0
+    },
+    "exact-term": {
+      "n": 9,
+      "dense recall@5": 1.0,
+      "keyword recall@5": 0.667,
+      "hybrid recall@5": 0.889
+    },
+    "multi-page": {
+      "n": 5,
+      "dense recall@5": 1.0,
+      "keyword recall@5": 0.8,
+      "hybrid recall@5": 1.0
+    },
+    "paraphrase": {
+      "n": 19,
+      "dense recall@5": 1.0,
+      "keyword recall@5": 0.737,
+      "hybrid recall@5": 0.842
+    }
+  }
+}

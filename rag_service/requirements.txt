@@ -1,0 +1,11 @@
+fastapi==0.163.1
+uvicorn==0.54.0
+pydantic==2.14.3
+pydantic-settings==2.16.3
+python-multipart==0.0.33
+pypdf==7.1.0
+psycopg[binary]==3.3.9
+psycopg-pool==3.3.0
+pgvector==0.5.1
+numpy==2.5.5
+google-genai==3.3.0
