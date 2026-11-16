@@ -1,3 +1,5 @@
+import logging
+import time
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from dataclasses import asdict
@@ -41,6 +43,20 @@ app = FastAPI(
     description="PDF ingestion with page-aware chunking, embeddings in pgvector, and top-k retrieval.",
     lifespan=lifespan,
 )
+
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+log = logging.getLogger("rag")
+
+
+@app.middleware("http")
+async def _timing(request: Request, call_next):
+    started = time.monotonic()
+    response = await call_next(request)
+    if request.url.path != "/health":
+        elapsed = time.monotonic() - started
+        log.info("%s %s -> %d in %.2fs", request.method, request.url.path, response.status_code, elapsed)
+    return response
 
 
 @app.exception_handler(EmbeddingError)

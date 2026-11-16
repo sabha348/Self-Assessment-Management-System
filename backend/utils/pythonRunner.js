@@ -20,8 +20,9 @@ function sanitizeArgs(args) {
 
 function runPythonProcess(scriptPath, args) {
   return new Promise((resolve, reject) => {
-    console.log('Running Python script:', scriptPath);
-    console.log('Raw arguments:', args);
+    // Log the script and argument sizes only: the arguments hold the user's PDF
+    // text and answers, which must not end up in the hosting provider's logs.
+    console.log('Running Python script:', scriptPath, 'arg sizes:', args.map((a) => String(a).length));
     const pythonProcess = spawn('python', [scriptPath, ...args]);
     let dataString = '';
     let errorString = '';
@@ -59,7 +60,7 @@ function runPythonProcess(scriptPath, args) {
           resolve(parsedData);
         } catch (error) {
           console.error("All parsing attempts failed:", error.message);
-          console.error("Raw data (first 200 chars):", dataString.substring(0, 200));
+          console.error("Unparseable output length:", dataString.length);
           reject(new Error(`Failed to parse output: ${error.message}`));
         }
       }
