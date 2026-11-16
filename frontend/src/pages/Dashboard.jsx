@@ -208,10 +208,12 @@ const Dashboard = () => {
         toast.success('File uploaded successfully');
         
         // Navigate to PDF viewer with the data
+        // The upload API returns only the new document's id; show the local copy.
         navigate('/pdf-viewer', {
           state: {
-            pdfData: `data:application/pdf;base64,${response.content}`,
-            title: file.name
+            pdfData: URL.createObjectURL(file),
+            title: file.name,
+            documentId: response._id
           }
         });
       } catch (error) {
