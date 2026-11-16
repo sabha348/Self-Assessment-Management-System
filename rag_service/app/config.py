@@ -25,6 +25,11 @@ class Settings(BaseSettings):
     # Texts embedded per minute (0 = unlimited). Gemini's free tier allows 100.
     embedding_max_per_minute: int = 90
 
+    # Generation / grading model (same env var as the Node backend).
+    llm_model: str = Field(default="gemini-3.5-flash-lite", validation_alias="GEMINI_MODEL")
+    max_questions: int = 10
+    grade_concurrency: int = 4
+
     # Chunking (characters; ~4 characters per English token).
     chunk_size: int = 1500
     chunk_overlap: int = 200

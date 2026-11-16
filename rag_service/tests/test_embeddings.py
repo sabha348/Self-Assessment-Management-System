@@ -20,9 +20,7 @@ class FakeModels:
             self.fail_first -= 1
             raise errors.APIError(self.code, self.body)
         # Unnormalised vectors, like reduced-dimension Gemini output.
-        return SimpleNamespace(
-            embeddings=[SimpleNamespace(values=[float(len(t))] * self.dim) for t in contents]
-        )
+        return SimpleNamespace(embeddings=[SimpleNamespace(values=[float(len(t))] * self.dim) for t in contents])
 
 
 def make(models, **kw):

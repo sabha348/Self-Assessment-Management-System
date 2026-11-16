@@ -2,12 +2,13 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.config import Settings, get_settings
-from app.main import app, get_embedder, get_store
-from tests.fakes import KeywordEmbedder
+from app.main import app, get_embedder, get_llm, get_store
+from tests.fakes import KeywordEmbedder, ScriptedLLM
 from tests.pdf_factory import make_pdf
 
 pytestmark = pytest.mark.db
 TOKEN = "test-token"
+LLM_HOLDER = {"llm": ScriptedLLM({})}
 H = {"X-Service-Token": TOKEN}
 
 BOOK = [
@@ -26,6 +27,7 @@ def client(store):
         get_settings: lambda: settings,
         get_store: lambda: store,
         get_embedder: lambda: emb,
+        get_llm: lambda: LLM_HOLDER["llm"],
     }
     # No `with`: the lifespan (real DB pool + Gemini client) is not started.
     yield TestClient(app), emb
@@ -115,9 +117,7 @@ def test_retrieve_validates_input_and_caps_k(client):
     upload(c)
     bad = c.post("/v1/retrieve", headers=H, json={"query": "", "user_id": "u1"})
     assert bad.status_code == 422
-    bad = c.post(
-        "/v1/retrieve", headers=H, json={"query": "q", "user_id": "u1", "page_min": 3, "page_max": 1}
-    )
+    bad = c.post("/v1/retrieve", headers=H, json={"query": "q", "user_id": "u1", "page_min": 3, "page_max": 1})
     assert bad.status_code == 422
     r = c.post("/v1/retrieve", headers=H, json={"query": "function", "user_id": "u1", "k": 999})
     assert r.status_code == 200 and len(r.json()["chunks"]) <= 4
@@ -146,3 +146,96 @@ def test_embedding_outage_returns_502(client, monkeypatch):
     r = c.post("/v1/retrieve", headers=H, json={"query": "q", "user_id": "u1"})
     assert r.status_code == 502
     assert "embedding provider unavailable" in r.json()["detail"]
+
+
+def gen_output(prompt):
+    # Cite whichever source mentions "while loop" (the retrieval decides the numbering).
+    sid = next(line.split("]")[0][1:] for line in prompt.splitlines() if line.startswith("[S") and "while" in prompt)
+    return {
+        "insufficient_context": False,
+        "questions": [
+            {
+                "question": "What makes a while loop stop?",
+                "reference_answer": "When its condition becomes false.",
+                "key_points": ["the condition becomes false"],
+                "source_ids": [sid],
+            },
+            {"question": "Invented?", "reference_answer": "x", "key_points": ["x"], "source_ids": ["S42"]},
+        ],
+    }
+
+
+def test_questions_are_grounded_and_cite_pages(client):
+    c, _ = client
+    upload(c)
+    LLM_HOLDER["llm"] = ScriptedLLM({"_GenOutput": gen_output})
+    r = c.post(
+        "/v1/questions",
+        headers=H,
+        json={"user_id": "u1", "document_id": "doc1", "n": 3, "focus_text": "A while loop repeats its body"},
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert [q["question"] for q in body["questions"]] == ["What makes a while loop stop?"]
+    assert body["dropped"] == 1
+    [cit] = body["questions"][0]["citations"]
+    assert cit["page_start"] == 3 and "while loop" in cit["snippet"]
+    assert body["retrieved"]
+
+
+def test_questions_require_an_indexed_document_owned_by_the_user(client):
+    c, _ = client
+    upload(c, user="owner")
+    for user, doc in (("owner", "nope"), ("intruder", "doc1")):
+        r = c.post("/v1/questions", headers=H, json={"user_id": user, "document_id": doc})
+        assert r.status_code == 409
+
+
+def test_grade_uses_the_users_own_chunks(client, store):
+    c, _ = client
+    upload(c)
+    chunk = store.search_keyword(
+        "while loop", __import__("app.store", fromlist=["SearchFilters"]).SearchFilters("u1"), 1
+    )[0]
+    LLM_HOLDER["llm"] = ScriptedLLM(
+        {
+            "_GradeOutput": {
+                "points": [{"point": 1, "status": "covered", "reason": "ok"}],
+                "contradicts_sources": False,
+                "feedback": "Right.",
+                "source_ids": ["S1"],
+            }
+        }
+    )
+    item = {
+        "question": "Q?",
+        "reference_answer": "ref",
+        "key_points": ["the condition becomes false"],
+        "source_chunk_ids": [chunk.chunk_id],
+        "answer": "it stops when the condition is false",
+    }
+    r = c.post("/v1/grade", headers=H, json={"user_id": "u1", "items": [item, {**item, "answer": "idk"}]})
+    assert r.status_code == 200, r.text
+    a, b = r.json()["results"]
+    assert (a["verdict"], a["score"], a["citations"][0]["page_start"]) == ("correct", 100, 3)
+    assert (b["verdict"], b["score"]) == ("incorrect", 0)
+    # Another user cannot grade against (and so read) these chunks.
+    r = c.post("/v1/grade", headers=H, json={"user_id": "intruder", "items": [item]})
+    assert r.status_code == 404
+
+
+def test_llm_outage_returns_502(client):
+    from app.llm import LLMError
+
+    c, _ = client
+    upload(c)
+
+    class Down:
+        name = "down"
+
+        def generate_json(self, *a, **k):
+            raise LLMError("LLM API error 503")
+
+    LLM_HOLDER["llm"] = Down()
+    r = c.post("/v1/questions", headers=H, json={"user_id": "u1", "document_id": "doc1"})
+    assert r.status_code == 502 and "LLM provider unavailable" in r.json()["detail"]
