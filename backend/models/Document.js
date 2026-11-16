@@ -32,7 +32,17 @@ const DocumentSchema = new mongoose.Schema({
   createdAt: {
     type: Date,
     default: Date.now
-  }
+  },
+  // Indexing in the RAG service (chunks + embeddings for grounded questions).
+  ragStatus: {
+    type: String,
+    enum: ['none', 'pending', 'processing', 'ready', 'failed'],
+    default: 'none'
+  },
+  ragError: { type: String },
+  ragPages: { type: Number },
+  ragChunks: { type: Number },
+  ragIndexedAt: { type: Date }
 });
 
 module.exports = mongoose.model('Document', DocumentSchema);
