@@ -19,7 +19,10 @@ const COMMON_SUBJECTS = [
 
 // Google Generative AI API configuration from environment variables
 const API_KEY = process.env.GOOGLE_API_KEY;
-const API_ENDPOINT = process.env.GOOGLE_AI_ENDPOINT || "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash";
+// Model names get retired (gemini-2.0-flash now returns 404), so the model is
+// configuration: GEMINI_MODEL, or a full GOOGLE_AI_ENDPOINT override.
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
+const API_ENDPOINT = process.env.GOOGLE_AI_ENDPOINT || `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}`;
 
 async function categorizeText(text, userId) {
   // Check if text is provided and API key is available
@@ -77,14 +80,20 @@ async function categorizeText(text, userId) {
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
-          maxOutputTokens: 150,
-          temperature: 0.2 // Even lower temperature for more deterministic output
+          // Gemini 3 models "think" before answering and thinking tokens count
+          // against maxOutputTokens: with 150 the answer was cut off after its
+          // first line (finishReason MAX_TOKENS), so every category but Subject
+          // came back "Unknown". Minimal thinking + a roomier cap fixes that.
+          maxOutputTokens: 1024,
+          temperature: 0.2,
+          thinkingConfig: { thinkingLevel: "minimal" }
         }
       })
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const body = await response.text().catch(() => "");
+      throw new Error(`HTTP ${response.status} from ${GEMINI_MODEL}: ${body.slice(0, 200)}`);
     }
 
     const data = await response.json();
