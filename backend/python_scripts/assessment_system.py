@@ -10,20 +10,22 @@ from typing import List, Dict, Optional
 class AssessmentSystem:
     def __init__(self,
                  api_key: str,
-                 model: str = "gemini-2.0-flash-lite",
+                 model: Optional[str] = None,
                  accuracy_threshold: int = 70,
                  evaluation_mode: str = 'balanced'):
         """
         Initialize the Assessment Management System with configurable evaluation.
 
         :param api_key: Google API key
-        :param model: The model to use (default is gemini-2.0-flash-lite)
+        :param model: The model to use (default: GEMINI_MODEL env var, else gemini-3.5-flash-lite)
         :param accuracy_threshold: Minimum accuracy percentage to consider an answer correct (default 70)
         :param evaluation_mode: Evaluation strictness ('lenient', 'balanced', 'strict')
         """
         try:
             self.api_key = api_key
-            self.model = model
+            # Model names get retired (gemini-2.0-flash-lite now returns 404), so
+            # the model is configuration, not code.
+            self.model = model or os.getenv("GEMINI_MODEL") or "gemini-3.5-flash-lite"
             
             # Initialize Gemini with safety settings
             genai.configure(api_key=self.api_key)
@@ -46,10 +48,8 @@ class AssessmentSystem:
                 safety_settings=safety_settings
             )
             
-            # Test the connection
-            response = self.client.generate_content("Test connection")
-            if not response:
-                raise Exception("Failed to initialize Gemini client")
+            # No "test connection" call: it cost one extra API request on every
+            # script run. Real errors surface on the first real call.
             
             self.score = 0
             self.accuracy_threshold = accuracy_threshold
