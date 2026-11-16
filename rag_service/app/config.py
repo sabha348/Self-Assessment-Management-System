@@ -27,6 +27,8 @@ class Settings(BaseSettings):
 
     # Generation / grading model (same env var as the Node backend).
     llm_model: str = Field(default="gemini-3.5-flash-lite", validation_alias="GEMINI_MODEL")
+    # Used once when the primary model stays overloaded (503/429) through all retries. "" disables.
+    llm_fallback_model: str = Field(default="gemini-3.1-flash-lite", validation_alias="GEMINI_FALLBACK_MODEL")
     max_questions: int = 10
     grade_concurrency: int = 4
 
