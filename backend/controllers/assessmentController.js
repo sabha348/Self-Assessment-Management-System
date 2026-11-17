@@ -1201,7 +1201,7 @@ const submitAssessment = async (req, res) => {
       });
     } catch (error) {
       console.error("Error evaluating answers:", error);
-      res.status(502).json({
+      res.status(error.status === 503 ? 503 : 502).json({
         error: "Evaluation process failed",
         details: error.message,
       });

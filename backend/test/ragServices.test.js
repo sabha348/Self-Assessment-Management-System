@@ -80,37 +80,27 @@ function fakeRag({ enabled = true } = {}) {
   };
 }
 
-test('grader routes grounded questions to RAG and others to legacy, keeping order', async () => {
+test('grader sends grounded questions with sources and older ones against the reference', async () => {
   const rag = fakeRag();
-  const legacyCalls = [];
-  const grader = createGrader({
-    rag,
-    runLegacy: async (data) => {
-      legacyCalls.push(data);
-      return { evaluations: data.answers.map((a, i) => ({ is_correct: false, accuracy: 10, missing_points: ['m'], correct_answer: data.correct_answers[i], user_answer: a })) };
-    },
-  });
+  const grader = createGrader({ rag });
   const out = await grader.grade('u1', [
     { question: legacy('L1'), userAnswer: 'x' },
     { question: grounded('G1'), userAnswer: 'good' },
     { question: grounded('G2'), userAnswer: 'meh' },
   ]);
-  assert.deepEqual(out.map((e) => e.grader), ['legacy-gemini', 'rag-points-v1', 'rag-points-v1']);
-  assert.deepEqual(out.map((e) => e.verdict), ['incorrect', 'correct', 'partial']);
+  assert.deepEqual(out.map((e) => e.grader), ['rag-reference-v1', 'rag-points-v1', 'rag-points-v1']);
+  assert.deepEqual(out.map((e) => e.verdict), ['partial', 'correct', 'partial']);
   assert.equal(out[1].is_correct, true);
-  assert.equal(out[2].accuracy, 50);
   assert.deepEqual(out[1].citations[0], { chunkId: 'c1', pageStart: 3, pageEnd: 3, pageLabelStart: 'iii', pageLabelEnd: 'iii', snippet: 's' });
-  assert.equal(rag.calls[0].userId, 'u1');
-  assert.deepEqual(rag.calls[0].items[0], { question: 'Q G1', reference_answer: 'ref G1', key_points: ['kp'], source_chunk_ids: ['c1'], answer: 'good' });
-  assert.deepEqual(legacyCalls[0], { answers: ['x'], correct_answers: ['ref L1'] });
+  const [legacyItem, groundedItem] = rag.calls[0].items;
+  assert.deepEqual(legacyItem, { question: 'Q L1', reference_answer: 'ref L1', key_points: [], source_chunk_ids: [], answer: 'x' });
+  assert.deepEqual(groundedItem, { question: 'Q G1', reference_answer: 'ref G1', key_points: ['kp'], source_chunk_ids: ['c1'], answer: 'good' });
+  assert.equal(rag.calls.length, 1); // one request for the whole quiz
 });
 
-test('grader falls back to legacy for grounded questions when RAG is disabled', async () => {
-  const rag = fakeRag({ enabled: false });
-  const grader = createGrader({ rag, runLegacy: async (d) => ({ evaluations: d.answers.map(() => ({ is_correct: true, accuracy: 90 })) }) });
-  const [e] = await grader.grade('u', [{ question: grounded('G'), userAnswer: 'a' }]);
-  assert.equal(e.grader, 'legacy-gemini');
-  assert.equal(rag.calls.length, 0);
+test('grader reports 503 when the RAG service is disabled', async () => {
+  const grader = createGrader({ rag: fakeRag({ enabled: false }) });
+  await assert.rejects(grader.grade('u', [{ question: grounded('G'), userAnswer: 'a' }]), (e) => e.status === 503);
 });
 
 // ---------------------------------------------------------------- indexer
@@ -230,4 +220,57 @@ test('grounded quiz: other users documents 404, empty generation 422, no documen
   await assert.rejects(gq.tryGenerate({ userId: 'intruder', body: { documentId: 'd1' } }), (e) => e.status === 404);
   await assert.rejects(gq.tryGenerate({ userId: 'u1', body: { documentId: 'd1' } }), (e) => e.status === 422);
   assert.deepEqual(await gq.tryGenerate({ userId: 'u1', body: { text: 'x' } }), { handled: false });
+});
+
+
+test('indexer on Blob storage sends a signed URL, copying GridFS PDFs to Blob first', async () => {
+  const Document = fakeDocuments({
+    old: { _id: 'old', gridFSId: 'g1', uploadedBy: 'u1', title: 'Old.pdf' },
+    fresh: { _id: 'fresh', blobPathname: 'pdfs/u1/new-abc.pdf', uploadedBy: 'u1', title: 'New.pdf' },
+  });
+  const copied = [];
+  const ingested = [];
+  const storage = {
+    blobEnabled: () => true,
+    copyGridFSToBlob: async (doc) => { copied.push(doc._id); return `pdfs/${doc.uploadedBy}/copied.pdf`; },
+    signedDownloadUrl: async (pathname) => `https://x.private.blob.vercel-storage.com/${pathname}?sig=1`,
+  };
+  const indexer = createIndexer({
+    Document,
+    rag: {
+      isEnabled: () => true,
+      ingestDocument: async () => { throw new Error('must not upload the PDF in the request body'); },
+      ingestFromUrl: async (args) => { ingested.push(args); return { pages: 2, chunks: 3 }; },
+    },
+    storage,
+    readFile: async () => { throw new Error('must not read GridFS directly'); },
+    logger: { error() {} },
+  });
+  assert.equal((await indexer.indexDocument('fresh')).status, 'ready');
+  assert.equal((await indexer.indexDocument('old')).status, 'ready');
+  assert.deepEqual(copied, ['old']); // only the GridFS one is copied
+  assert.deepEqual(ingested.map((a) => a.url), [
+    'https://x.private.blob.vercel-storage.com/pdfs/u1/new-abc.pdf?sig=1',
+    'https://x.private.blob.vercel-storage.com/pdfs/u1/copied.pdf?sig=1',
+  ]);
+});
+
+test('uploads are only accepted as PDFs in the uploader\'s own folder', () => {
+  const { isAllowedUploadPath } = require('../services/pdfStorage');
+  assert.equal(isAllowedUploadPath('pdfs/u1/notes.pdf', 'u1'), true);
+  assert.equal(isAllowedUploadPath('pdfs/u1/Notes.PDF', 'u1'), true);
+  assert.equal(isAllowedUploadPath('pdfs/u2/notes.pdf', 'u1'), false); // someone else's folder
+  assert.equal(isAllowedUploadPath('pdfs/u1/../u2/x.pdf', 'u1'), false);
+  assert.equal(isAllowedUploadPath('pdfs/u1/script.html', 'u1'), false);
+  assert.equal(isAllowedUploadPath('pdfs/u10/x.pdf', 'u1'), false); // prefix must end at the folder
+  assert.equal(isAllowedUploadPath(undefined, 'u1'), false);
+});
+
+test('background work runs after the caller returns', async () => {
+  const { runInBackground } = require('../utils/background');
+  const order = [];
+  const p = runInBackground(async () => { order.push('task'); throw new Error('boom'); }, 'test');
+  order.push('caller');
+  await p; // errors are logged, never thrown into the request
+  assert.deepEqual(order, ['caller', 'task']);
 });

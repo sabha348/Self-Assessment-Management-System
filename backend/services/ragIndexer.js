@@ -6,23 +6,28 @@
  * Document's ragStatus (pending -> processing -> ready | failed) is what the
  * UI polls.
  */
-const { GridFSBucket } = require('mongodb');
-const mongoose = require('mongoose');
+const { readGridFS } = require('./pdfStorage');
 
-function readGridFS(gridFSId, db = mongoose.connection.db) {
-  return new Promise((resolve, reject) => {
-    const bucket = new GridFSBucket(db, { bucketName: 'pdfFiles' });
-    const chunks = [];
-    bucket
-      .openDownloadStream(gridFSId)
-      .on('data', (c) => chunks.push(c))
-      .on('error', reject)
-      .on('end', () => resolve(Buffer.concat(chunks)));
-  });
-}
-
-function createIndexer({ Document, rag, readFile = readGridFS, logger = console }) {
+function createIndexer({
+  Document,
+  rag,
+  readFile = readGridFS,
+  storage = require('./pdfStorage'),
+  background = require('../utils/background').runInBackground,
+  logger = console,
+}) {
   const inFlight = new Set(); // don't index the same document twice at once
+
+  // Large PDFs must not travel in a request body (4.5 MB on serverless): with
+  // Blob storage the RAG service downloads the PDF itself via a signed URL.
+  async function send(doc) {
+    const meta = { documentId: doc._id, userId: doc.uploadedBy, title: doc.title };
+    if (storage.blobEnabled()) {
+      const pathname = doc.blobPathname || (await storage.copyGridFSToBlob(doc, Document));
+      return rag.ingestFromUrl({ ...meta, url: await storage.signedDownloadUrl(pathname) });
+    }
+    return rag.ingestDocument({ ...meta, buffer: await readFile(doc.gridFSId) });
+  }
 
   async function indexDocument(documentId) {
     const key = String(documentId);
@@ -31,18 +36,12 @@ function createIndexer({ Document, rag, readFile = readGridFS, logger = console 
     try {
       const doc = await Document.findById(documentId);
       if (!doc) return { skipped: 'missing' };
-      if (!doc.gridFSId) {
+      if (!doc.gridFSId && !doc.blobPathname) {
         await Document.updateOne({ _id: doc._id }, { ragStatus: 'failed', ragError: 'No stored PDF for this document' });
         return { status: 'failed' };
       }
       await Document.updateOne({ _id: doc._id }, { ragStatus: 'processing', $unset: { ragError: 1 } });
-      const buffer = await readFile(doc.gridFSId);
-      const res = await rag.ingestDocument({
-        documentId: doc._id,
-        userId: doc.uploadedBy,
-        title: doc.title,
-        buffer,
-      });
+      const res = await send(doc);
       await Document.updateOne(
         { _id: doc._id },
         { ragStatus: 'ready', ragPages: res.pages, ragChunks: res.chunks, ragIndexedAt: new Date() }
@@ -63,7 +62,7 @@ function createIndexer({ Document, rag, readFile = readGridFS, logger = console 
   async function scheduleIndex(documentId) {
     if (!rag.isEnabled()) return false;
     await Document.updateOne({ _id: documentId }, { ragStatus: 'pending' });
-    setImmediate(() => indexDocument(documentId));
+    background(() => indexDocument(documentId), `indexing ${documentId}`);
     return true;
   }
 
@@ -80,4 +79,4 @@ function getIndexer() {
   return defaultIndexer;
 }
 
-module.exports = { createIndexer, getIndexer, readGridFS };
+module.exports = { createIndexer, getIndexer };

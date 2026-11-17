@@ -1,12 +1,9 @@
 const express = require("express");
 const router = express.Router();
-const { runPythonProcess } = require("../utils/pythonRunner");
 const Question = require("../models/Question"); // Corrected case sensitivity
 const Quiz = require("../models/Quiz");
 const UserAnswer = require("../models/UserAnswer");
 const mongoose = require("mongoose");
-// Import the text categorizer
-const { categorizeText } = require("../utils/TextCategory");
 const { authenticateToken } = require("../middleware/authenticate");
 const { getGrader } = require("../services/grading");
 const { getGroundedQuiz } = require("../services/groundedQuiz");
@@ -17,291 +14,28 @@ router.use(authenticateToken);
 
 // Initiate assessment route
 router.post("/", async (req, res) => {
+  const userId = req.user.userId;
   try {
-    const {
-      text,
-      numQuestions = 5,
-      difficulty = "medium",
-      type = "open-ended",
-      timeLimit = 0,
-      topic = "General",
-      subject = "Knowledge",
-    } = req.body;
-    const userId = req.user.userId;
-
-    // Grounded path: questions only from the user's indexed PDF, with page citations.
-    let indexing = false;
-    try {
-      const grounded = await getGroundedQuiz().tryGenerate({ userId, body: req.body });
-      if (grounded.handled) return res.json(grounded.body);
-      indexing = Boolean(grounded.indexing);
-    } catch (err) {
-      if (err.status === 404 || err.status === 422) {
-        return res.status(err.status).json({ error: err.message });
-      }
-      // RAG service down: fall back to the legacy generator rather than failing.
-      console.error("Grounded generation failed, using legacy path:", err.message);
-    }
-
-    if (!text || typeof text !== "string") {
-      return res.status(400).json({ error: "Valid text input is required" });
-    }
-
-    // First create a Quiz with the provided values
-    let quizId, questionsArray;
-    try {
-      const quiz = new Quiz({
-        numberOfQuestions: numQuestions,
-        userId: userId,
-        difficulty: difficulty,
-        type: type,
-        topic: topic,
-        content: text.substring(0, 1000), // Store a preview of the content
-        subject: subject,
-        quizTime: timeLimit || 30, // Use provided timeLimit or default
-      });
-
-      const savedQuiz = await quiz.save();
-      quizId = savedQuiz._id;
-
-      // Pass these parameters to the Python script for better question generation
-      const extraParams = [];
-      if (difficulty && difficulty !== "medium") {
-        extraParams.push("--difficulty", difficulty);
-      }
-      if (type && type !== "open-ended") {
-        extraParams.push("--type", type);
-      }
-
-      // Clean text and generate questions
-      const cleanText = text.replace(/\r?\n/g, " ").trim();
-
-      const questions = await runPythonProcess(
-        "./python_scripts/questions.py",
-        [cleanText, numQuestions.toString(), ...extraParams]
-      );
-
-      if (!Array.isArray(questions)) {
-        throw new Error("Invalid questions format received");
-      }
-
-      // Clean questions array and ensure proper formatting
-      questionsArray = questions
-        .map((q) => {
-          if (typeof q !== "string") {
-            console.warn("Non-string question received:", q);
-            return "";
-          }
-
-          // More thorough sanitization
-          return q
-            .replace(/[\r\n]+/g, " ") // Replace all newlines with spaces
-            .replace(/\s{2,}/g, " ") // Replace multiple spaces with single space
-            .replace(/^["\s\-'"]+|["\s'"]+$/g, "") // Remove quotes, apostrophes, dashes at start/end
-            .trim();
-        })
-        .filter((q) => q.length > 0); // Remove any empty questions
-
-      // Include categories in the response
-      res.json({
-        quizId,
-        questions: questionsArray,
-        grounded: false,
-        indexing, // true while this PDF is being indexed for grounded questions
-      });
-
-      try {
-        // Move categorization to background processing
-        console.log("Categorizing text content...");
-        const categories = await categorizeText(cleanText, userId);
-
-        // Update the quiz with category information
-        await Quiz.findByIdAndUpdate(quizId, {
-          subject: categories.Subject,
-          topic: categories.Topic,
-          subtopic: categories.Subtopic,
-          concept: categories.Concept,
-        });
-
-        console.log("Text categorized and quiz updated successfully.");
-
-        // Generate correct answers with cleaned data
-        console.log("Generating correct answers in the background..."); // Generate correct answers with cleaned data
-        const correctAnswers = await runPythonProcess(
-          "./python_scripts/correct_answers.py",
-          [
-            cleanText,
-            JSON.stringify(questionsArray), // Send cleaned questions array
-          ]
-        );
-
-        if (!Array.isArray(correctAnswers)) {
-          throw new Error("Invalid correct answers format received");
-        }
-
-        // Clean correct answers array
-        const cleanedCorrectAnswers = correctAnswers.map((a) =>
-          typeof a === "string" ? a.trim() : String(a)
-        );
-
-        // Save questions with quiz reference, updated categories, and position
-        const savePromises = [];
-        for (let i = 0; i < questionsArray.length; i++) {
-          const questionText = questionsArray[i];
-          const correctAnswer = cleanedCorrectAnswers[i];
-
-          // Check for existing similar questions for this user
-          const existingQuestion = await Question.findOne({
-            userId: userId,
-            // Use a case-insensitive search and remove extra whitespace for comparison
-            $expr: {
-              $regexMatch: {
-                input: { $toLower: "$question" },
-                regex: new RegExp(
-                  "^" +
-                    questionText
-                      .toLowerCase()
-                      .replace(/[.*+?^${}()|[\]\\]/g, "\\$&") // Escape regex special chars
-                      .replace(/\s+/g, "\\s+") + // Replace spaces with flexible space matching
-                    "$"
-                ),
-              },
-            },
-          });
-
-          if (existingQuestion) {
-            // Check if the answers are significantly different
-            const existingAnswer = existingQuestion.correctAnswer || "";
-            const newAnswer = correctAnswer || "";
-
-            // Use text similarity check (simplified version)
-            function calculateSimilarity(text1, text2) {
-              // Convert to lowercase and remove extra spaces
-              const a = text1.toLowerCase().trim().replace(/\s+/g, " ");
-              const b = text2.toLowerCase().trim().replace(/\s+/g, " ");
-
-              // If strings are empty or very short, simple comparison
-              if (a.length < 10 || b.length < 10) {
-                return a === b ? 1.0 : 0.0;
-              }
-
-              // Simple word overlap calculation
-              const aWords = new Set(a.split(/\s+/));
-              const bWords = new Set(b.split(/\s+/));
-
-              let intersection = 0;
-              for (const word of aWords) {
-                if (bWords.has(word)) intersection++;
-              }
-
-              const union = aWords.size + bWords.size - intersection;
-              return intersection / union;
-            }
-
-            const answerSimilarity = calculateSimilarity(
-              existingAnswer,
-              newAnswer
-            );
-            console.log(
-              `Question similarity check: "${questionText.substring(
-                0,
-                30
-              )}..." - Answer similarity: ${answerSimilarity}`
-            );
-
-            // If answers are significantly different (less than 70% similarity), save as new question
-            if (answerSimilarity < 0.7) {
-              console.log(
-                "Answers differ significantly - saving as new question"
-              );
-              const newQuestion = new Question({
-                questionId: `Q${Date.now()}${i}`,
-                quizeRef: quizId,
-                question: questionText,
-                correctAnswer: correctAnswer,
-                userId: userId,
-                type: quiz.type,
-                position: i,
-                subject: quiz.subject,
-                topic: quiz.topic,
-                subtopic: quiz.subtopic,
-                concept: quiz.concept,
-                difficulty: quiz.difficulty,
-              });
-              savePromises.push(newQuestion.save());
-            } else {
-              console.log(
-                `Skipping duplicate question: "${questionText.substring(
-                  0,
-                  30
-                )}..."`
-              );
-
-              // Add existing question to the quiz instead of creating a duplicate
-              const linkedQuestion = new Question({
-                questionId: `Q${Date.now()}${i}`,
-                quizeRef: quizId,
-                question: existingQuestion.question,
-                correctAnswer: existingQuestion.correctAnswer,
-                userId: userId,
-                type: existingQuestion.type || quiz.type,
-                position: i,
-                subject: existingQuestion.subject || quiz.subject,
-                topic: existingQuestion.topic || quiz.topic,
-                subtopic: existingQuestion.subtopic || quiz.subtopic,
-                concept: existingQuestion.concept || quiz.concept,
-                difficulty: existingQuestion.difficulty || quiz.difficulty,
-              });
-              savePromises.push(linkedQuestion.save());
-            }
-          } else {
-            // No existing similar question found, save the new one
-            const newQuestion = new Question({
-              questionId: `Q${Date.now()}${i}`,
-              quizeRef: quizId,
-              question: questionText,
-              correctAnswer: correctAnswer,
-              userId: userId,
-              type: quiz.type,
-              position: i,
-              subject: quiz.subject,
-              topic: quiz.topic,
-              subtopic: quiz.subtopic,
-              concept: quiz.concept,
-              difficulty: quiz.difficulty,
-            });
-            savePromises.push(newQuestion.save());
-          }
-        }
-
-        await Promise.all(savePromises);
-        console.log("Background processing completed successfully");
-      } catch (bgError) {
-        // Just log errors in background processing, don't crash
-        console.error("Background processing error:", bgError);
-
-        // If needed, update quiz status to indicate an error
-        await Quiz.findByIdAndUpdate(quizId, { status: "error" });
-      }
-    } catch (error) {
-      console.error("Processing error:", error);
-      // Only send error response if we haven't already sent a response
-      if (!res.headersSent) {
-        res.status(500).json({
-          error: "Failed to process text",
-          details: error.message,
-        });
-      }
-    }
-  } catch (error) {
-    console.error("Router error:", error);
-    // Only send error response if we haven't already sent a response
-    if (!res.headersSent) {
-      res.status(500).json({
-        error: "Server error",
-        details: error.message,
+    // Questions come only from the user's indexed PDF, with page citations.
+    const grounded = await getGroundedQuiz().tryGenerate({ userId, body: req.body });
+    if (grounded.handled) return res.json(grounded.body);
+    if (grounded.indexing) {
+      // First use of a PDF (or still processing): indexing has been started.
+      return res.status(409).json({
+        error: "This PDF is being prepared for cited questions. Try again in a minute.",
+        indexing: true,
       });
     }
+    if (!req.body.documentId) {
+      return res.status(400).json({ error: "Open a PDF to generate questions from it" });
+    }
+    return res.status(503).json({ error: "Question generation is not available on this server" });
+  } catch (err) {
+    if (err.status === 404 || err.status === 422) {
+      return res.status(err.status).json({ error: err.message });
+    }
+    console.error("Question generation failed:", err.message);
+    return res.status(502).json({ error: "Question generation failed. Please try again." });
   }
 });
 
@@ -340,72 +74,8 @@ router.post("/:quizId/submit", async (req, res) => {
         .json({ error: "Questions not found for the quiz" });
     }
 
-    // Format data for evaluation
-    let questionsData = [];
-    let userAnswersData = [];
-    let correctAnswersData = [];
-
     // Convert answers object to array format
     const answersArray = Object.values(answers);
-
-    // Check if we have correct answers in the database, and if not, generate them on-demand
-    let missingCorrectAnswers = false;
-    const questionsWithoutAnswers = questions.filter(
-      (q) => !q.grounded && (!q.correctAnswer || q.correctAnswer === "Unable to generate answer")
-    );
-
-    if (questionsWithoutAnswers.length > 0) {
-      console.log(
-        `Found ${questionsWithoutAnswers.length} questions without correct answers. Generating them now.`
-      );
-      missingCorrectAnswers = true;
-
-      try {
-        // On-demand generation of correct answers
-        const correctAnswers = await runPythonProcess(
-          "./python_scripts/correct_answers.py",
-          [
-            quiz.content,
-            JSON.stringify(questionsWithoutAnswers.map((q) => q.question)),
-          ]
-        );
-
-        if (Array.isArray(correctAnswers)) {
-          // Update the questions in the database with the newly generated answers
-          const updatePromises = questionsWithoutAnswers.map(
-            (question, idx) => {
-              return Question.findByIdAndUpdate(
-                { _id: question._id, userId: userId },
-                {
-                  correctAnswer: correctAnswers[idx] || "No answer available",
-                }
-              );
-            }
-          );
-
-          await Promise.all(updatePromises);
-          console.log("Successfully generated missing correct answers");
-
-          // Refresh the questions with the newly added answers
-          const updatedQuestions = await Question.find({
-            quizeRef: quizId,
-            userId: userId,
-          }).sort({ position: 1 });
-
-          questions.forEach((q, idx) => {
-            const updatedQ = updatedQuestions.find(
-              (uq) => uq._id.toString() === q._id.toString()
-            );
-            if (updatedQ && updatedQ.correctAnswer) {
-              questions[idx].correctAnswer = updatedQ.correctAnswer;
-            }
-          });
-        }
-      } catch (error) {
-        console.error("Failed to generate missing correct answers:", error);
-        // Continue with the available correct answers
-      }
-    }
 
     // Pair each answered question with its answer (by position, not by
     // question text, which breaks when two questions share the same wording).
@@ -463,7 +133,7 @@ router.post("/:quizId/submit", async (req, res) => {
       });
     } catch (error) {
       console.error("Error evaluating answers:", error);
-      res.status(502).json({
+      res.status(error.status === 503 ? 503 : 502).json({
         error: "Evaluation process failed",
         details: error.message,
       });
