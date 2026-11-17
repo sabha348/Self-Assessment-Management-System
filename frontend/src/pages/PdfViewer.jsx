@@ -16,6 +16,17 @@ import '@react-pdf-viewer/thumbnail/lib/styles/index.css';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
+// Questions are generated automatically after this much reading time.
+const AUTO_GENERATE_MS = 5 * 60 * 1000;
+// How often the reading timer is checked (short, so the countdown is accurate).
+const AUTO_CHECK_MS = 15 * 1000;
+const IS_TOUCH = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+
+const formatCountdown = (ms) => {
+  const total = Math.max(0, Math.ceil(ms / 1000));
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
+};
+
 const PdfViewer = () => {
   const location = useLocation();
   const token = localStorage.getItem('token');
@@ -69,6 +80,10 @@ const PdfViewer = () => {
   const [autoSubmissionTimer, setAutoSubmissionTimer] = useState(null);
   const [isTimerPaused, setIsTimerPaused] = useState(false);
   const [lastSubmissionTime, setLastSubmissionTime] = useState(Date.now());
+  // The interval callback reads the ref: state captured in a closure goes stale.
+  const lastSubmissionRef = useRef(Date.now());
+  const markSubmitted = (t) => { lastSubmissionRef.current = t; setLastSubmissionTime(t); };
+  const [nowTick, setNowTick] = useState(Date.now());
   const [startTime, setStartTime] = useState(Date.now());
   const [savedMarkers, setSavedMarkers] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
@@ -178,7 +193,10 @@ const [isProcessingResults, setIsProcessingResults] = useState(false);
   useEffect(() => {
     const handleTextSelection = () => {
       const selection = window.getSelection();
-      if (!selection || !selection.rangeCount) return;
+      if (!selection || !selection.rangeCount) {
+        setShowButton(false);
+        return;
+      }
 
       const text = selection.toString().trim();
       if (!text) {
@@ -200,10 +218,13 @@ const [isProcessingResults, setIsProcessingResults] = useState(false);
         // Get the selection boundaries
         const rect = range.getBoundingClientRect();
         
-        // Position the button at the top of the selection
+        // Above the selection with a mouse; below it on touch screens, where the
+        // phone's own copy/share bar sits above the selection.
         setButtonPosition({
-          x: rect.left + (rect.width / 2),
-          y: Math.max(rect.top + window.scrollY - 60, 70) // Ensure button doesn't go above header
+          x: Math.min(Math.max(rect.left + (rect.width / 2), 60), window.innerWidth - 60),
+          y: IS_TOUCH
+            ? Math.min(rect.bottom + window.scrollY + 12, window.innerHeight - 60)
+            : Math.max(rect.top + window.scrollY - 60, 70) // Ensure button doesn't go above header
         });
         setSelectedText(text);
         // Which PDF pages the selection spans (physical, 1-based), so the
@@ -238,12 +259,20 @@ const [isProcessingResults, setIsProcessingResults] = useState(false);
       }
     };
 
+    // Phones: a long-press selection fires no mouseup, and the user then drags the
+    // handles, so react once the selection has settled.
+    let selectionTimer = null;
+    const handleSelectionChange = () => {
+      clearTimeout(selectionTimer);
+      selectionTimer = setTimeout(handleTextSelection, 400);
+    };
+
     const handleScroll = () => {
       setShowButton(false);
       // Only create timer if not already showing questions or results
       if (!isTimerPaused && !showQuestions && !showResults && !autoSubmissionTimer) {
         console.log('Setting up timer from scroll handler');
-        const timer = setInterval(handleAutoSubmission, 60 * 1000);
+        const timer = setInterval(handleAutoSubmission, AUTO_CHECK_MS);
         setAutoSubmissionTimer(timer);
       }
     };
@@ -252,8 +281,11 @@ const [isProcessingResults, setIsProcessingResults] = useState(false);
     document.addEventListener('mouseup', handleTextSelection);
     document.addEventListener('click', handleClick);
     document.addEventListener('scroll', handleScroll);
+    if (IS_TOUCH) document.addEventListener('selectionchange', handleSelectionChange);
     
     return () => {
+      clearTimeout(selectionTimer);
+      document.removeEventListener('selectionchange', handleSelectionChange);
       document.removeEventListener('mouseup', handleTextSelection);
       document.removeEventListener('click', handleClick);
       document.removeEventListener('scroll', handleScroll);
@@ -399,8 +431,9 @@ const getVisibleText = useCallback(() => {
     const elementTop = rect.top + scrollPosition;
     const elementBottom = rect.bottom + scrollPosition;
     
-    // Only consider elements that have been scrolled past or are currently visible
-    if (elementBottom <= visibleBottom) {
+    // Pages that have been scrolled past or are on screen now. A page counts as
+    // soon as its top is visible: on a phone a whole page never fits on screen.
+    if (elementTop < visibleBottom || elementBottom <= visibleBottom) {
       const pageText = textLayer.textContent || '';
       console.log(`Page ${index+1} text length: ${pageText.length} chars`);
       allText += pageText + ' ';
@@ -441,7 +474,9 @@ const getVisibleText = useCallback(() => {
 }, [lastReadPosition]);
 
   // Replace your current handleAutoSubmission function with this fixed version:
-const handleAutoSubmission = useCallback(async () => {
+const handleAutoSubmission = useCallback(async (options) => {
+  // setInterval calls this with no arguments; the "Generate now" button passes {force: true}.
+  const force = options?.force === true;
   // Don't run if timer should be paused
   if (isTimerPaused || showQuestions || showResults) {
     console.log('Auto-submission paused - questions or results are shown');
@@ -449,12 +484,9 @@ const handleAutoSubmission = useCallback(async () => {
   }
   
   const currentTime = Date.now();
-  const timeSinceLastSubmission = currentTime - lastSubmissionTime;
-  const FIVE_MINUTES = 5 * 60 * 1000;
+  const timeSinceLastSubmission = currentTime - lastSubmissionRef.current;
   
-  console.log(`Time since last check: ${Math.round(timeSinceLastSubmission/1000)}s, Need: ${FIVE_MINUTES/1000}s`);
-  
-  if (timeSinceLastSubmission < FIVE_MINUTES) {
+  if (!force && timeSinceLastSubmission < AUTO_GENERATE_MS) {
     return; // Not time to check yet
   }
   
@@ -462,15 +494,16 @@ const handleAutoSubmission = useCallback(async () => {
   const newText = getVisibleText();
   
   // IMPORTANT: Set this immediately to prevent duplicate runs regardless of outcome
-  setLastSubmissionTime(currentTime);
+  markSubmitted(currentTime);
   
   // Ensure we have enough text to generate meaningful questions
   if (newText && newText.length >= TEXT_LIMITS.MIN_CHARS) {
+    let loadingToastId;
     try {
       console.log(`Found ${newText.length} chars of new content - generating questions`);
       
       // Store toast reference properly
-      const loadingToastId = toast.loading('Auto-generating questions from your reading...');
+      loadingToastId = toast.loading(force ? 'Generating questions from your reading...' : 'Auto-generating questions from your reading...');
       
       const questionSettings = questionConfig;
 
@@ -495,6 +528,7 @@ const handleAutoSubmission = useCallback(async () => {
 
       if (!response.data.quizId) {
         console.error('No quizId in API response:', response.data);
+        toast.dismiss(loadingToastId);
         toast.error('Server error: Missing quiz information');
         return;
       }
@@ -527,15 +561,14 @@ const handleAutoSubmission = useCallback(async () => {
     } 
     catch (error) {
       console.error('Error in auto-submission:', error);
-      
-      // No need to dismiss a non-existent toast
-      toast.error('Failed to generate questions from your reading.');
-      
-      // Set a longer delay before next attempt on failure
-      // This prevents rapid consecutive failures
-      setLastSubmissionTime(currentTime);
+      toast.dismiss(loadingToastId);
+      // e.g. 409 "This PDF is being prepared..." while it is still being indexed
+      toast.error(error.response?.data?.error || 'Failed to generate questions from your reading.');
+      // The next automatic attempt waits a full interval again.
+      markSubmitted(Date.now());
     }
   } else {
+    if (force) toast.error('Scroll through some of the PDF first, then try again.');
     console.log('Insufficient new content:', {
       contentLength: newText?.length || 0,
       minRequired: TEXT_LIMITS.MIN_CHARS,
@@ -796,6 +829,15 @@ const handleSubmitAnswers = useCallback(async (isTimeUp = false, explicitQuizId 
     }
   }, [buttonPosition.y, evaluationResults, pdfData, savedMarkers]);
 
+  // 1 s tick for the "questions in m:ss" countdown, only while reading.
+  const readingActive = !isTimerPaused && !showQuestions && !showResults;
+  useEffect(() => {
+    if (!readingActive) return undefined;
+    const t = setInterval(() => setNowTick(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [readingActive]);
+  const msUntilQuestions = AUTO_GENERATE_MS - (nowTick - lastSubmissionTime);
+
   // Delete ALL other timer-related useEffect hooks and keep only this consolidated one
 useEffect(() => {
   // Clear any existing timer first
@@ -807,9 +849,9 @@ useEffect(() => {
 
   // Only set up a new timer if not paused AND not showing questions/results
   if (!isTimerPaused && !showQuestions && !showResults) {
-    console.log('Setting up single auto-submission timer - checks every 60 seconds');
+    console.log('Setting up single auto-submission timer');
     
-    const timer = setInterval(handleAutoSubmission, 60 * 1000);
+    const timer = setInterval(handleAutoSubmission, AUTO_CHECK_MS);
     setAutoSubmissionTimer(timer);
     
     return () => {
@@ -1346,7 +1388,7 @@ useEffect(() => {
       )}
 
       <div className="max-w-6xl mx-auto">
-         <div className="bg-white rounded-lg shadow-sm p-4 mb-4 flex justify-between items-center sticky top-0 z-10">
+         <div className="bg-white rounded-lg shadow-sm p-4 mb-4 flex flex-wrap gap-2 justify-between items-center sticky top-0 z-10">
           <h1 className="text-xl font-semibold">{title || 'PDF Viewer'}</h1>
           {ragStatus?.enabled && ragStatus.status !== 'none' && (
             <span
@@ -1363,7 +1405,21 @@ useEffect(() => {
                 : 'Indexing for cited questions…'}
             </span>
           )}
-          <div className="flex space-x-4">
+          <div className="flex flex-wrap items-center gap-2">
+            {documentId && readingActive && (
+              <>
+                <span data-testid="auto-countdown" className="text-sm text-gray-500 tabular-nums">
+                  {msUntilQuestions > 0 ? `Questions in ${formatCountdown(msUntilQuestions)}` : 'Questions coming up…'}
+                </span>
+                <button
+                  data-testid="generate-now"
+                  onClick={() => handleAutoSubmission({ force: true })}
+                  className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg"
+                >
+                  Generate now
+                </button>
+              </>
+            )}
             <button 
               onClick={() => navigate('/dashboard')}
               className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg"
