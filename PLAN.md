@@ -163,7 +163,7 @@ Every commit is small and leaves the app working. A feature flag, `RAG_ENABLED`,
 
 → **Stop: open the M3 PR.**
 
-### M4 (optional): Move everything to Vercel. Needs your accounts.
+### M4: Move everything to Vercel (done: Vercel + Neon + Atlas, see README "Deployment")
 
 **Can the whole stack run on Vercel? Yes, once M2 is done.**
 

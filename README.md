@@ -70,7 +70,9 @@ flowchart LR
   GRD -. JSON schema .-> Gemini
 ```
 
-1. **Upload**: the PDF goes to GridFS; the backend indexes it in the background. The RAG service
+1. **Upload**: the PDF goes to Vercel Blob in production (the browser uploads it directly, with a
+   short-lived token from the API) or GridFS locally; the backend indexes it in the background, and in
+   production the RAG service downloads it itself through a 10-minute signed URL. The RAG service
    extracts text per page (keeping physical page numbers and printed labels like `xii` or `44`),
    chunks it into exact character spans so every chunk knows its page range, embeds the chunks
    (`gemini-embedding-001`, 768-d, normalised) and stores them in pgvector.
@@ -97,6 +99,23 @@ flowchart LR
   server's `RetryInfo` delay and fall back to a second model when the first stays overloaded.
 - **Security boundary.** End users never reach the RAG service: the backend authenticates them (JWT) and
   calls the service with a shared token and the verified user id; every query filters on that user.
+
+## Deployment
+
+Everything runs serverless, so there is no 50-second cold start like the old Render free tier.
+
+| Part | Where | Notes |
+|---|---|---|
+| React app | Vercel (`sams-frontend`) | static build, SPA rewrite |
+| Express API | Vercel function (`sams-api`, `backend/`, sin1) | `server.js` exports the app; indexing runs after the response via `waitUntil` |
+| RAG service | Vercel Python function (`sams-rag`, `rag_service/`, sin1) | ~150 MB bundle, no torch: embeddings come from the API |
+| PDFs | Vercel Blob (private) | uploads bypass the 4.5 MB function body limit |
+| Vectors | Neon Postgres + pgvector (Singapore) | scales to zero, wakes in ~0.5 s, never paused for inactivity |
+| App data | MongoDB Atlas | unchanged |
+
+Why Neon over Supabase: the free Supabase project pauses after a week without traffic and has to be
+restored by hand; Neon only suspends compute and resumes on the next query. Pushing to `main` redeploys
+all three Vercel projects.
 
 ## Run it locally
 
@@ -149,5 +168,6 @@ analytics, Stripe premium plan, admin panel (users, notifications, settings).
 
 ## Configuration
 
-See `backend/.env.example`, `rag_service/README.md` and `.env.example` (Docker). The RAG path is
-off unless `RAG_ENABLED=true`; without it the app falls back to the earlier, ungrounded generator.
+See `backend/.env.example`, `rag_service/README.md` and `.env.example` (Docker). Question
+generation and grading need the RAG service (`RAG_ENABLED=true`); without it those endpoints return 503.
+Blob uploads switch on when `BLOB_READ_WRITE_TOKEN` is set; otherwise PDFs go to GridFS.
