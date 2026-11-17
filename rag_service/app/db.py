@@ -44,6 +44,13 @@ def make_pool(database_url: str, min_size: int = 1, max_size: int = 5) -> Connec
         min_size=min_size,
         max_size=max_size,
         configure=_configure,
+        # Serverless Postgres (Neon) closes idle connections when its compute scales
+        # to zero, and a serverless function can be frozen between requests: check
+        # each connection before handing it out instead of failing on a dead one.
+        check=ConnectionPool.check_connection,
+        max_idle=60,
         open=True,
-        kwargs={"autocommit": False},
+        # No server-side prepared statements: they break behind PgBouncer-style
+        # transaction poolers (Neon's pooled endpoint).
+        kwargs={"autocommit": False, "prepare_threshold": None},
     )

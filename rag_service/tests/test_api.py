@@ -239,3 +239,54 @@ def test_llm_outage_returns_502(client):
     LLM_HOLDER["llm"] = Down()
     r = c.post("/v1/questions", headers=H, json={"user_id": "u1", "document_id": "doc1"})
     assert r.status_code == 502 and "LLM provider unavailable" in r.json()["detail"]
+
+
+def test_ingest_from_url_downloads_then_ingests(client, monkeypatch):
+    import app.main as main
+
+    c, _ = client
+    seen = {}
+
+    def fake_fetch(url, hosts, max_bytes):
+        seen.update(url=url, hosts=hosts, max_bytes=max_bytes)
+        return make_pdf(BOOK)
+
+    monkeypatch.setattr(main, "fetch_pdf", fake_fetch)
+    body = {
+        "document_id": "u-doc",
+        "user_id": "u1",
+        "title": "Book",
+        "source_url": "https://s.private.blob.vercel-storage.com/pdfs/u1/book.pdf",
+    }
+    r = c.post("/v1/documents/from-url", headers=H, json=body)
+    assert r.status_code == 200, r.text
+    assert r.json()["pages"] == 4
+    assert seen["hosts"] == ["blob.vercel-storage.com"] and seen["max_bytes"] == 1024 * 1024
+    assert c.post("/v1/documents/from-url", json=body).status_code == 401
+
+
+def test_ingest_from_url_rejects_other_hosts(client):
+    c, _ = client
+    body = {"document_id": "d", "user_id": "u1", "source_url": "https://169.254.169.254/latest/meta-data"}
+    r = c.post("/v1/documents/from-url", headers=H, json=body)
+    assert r.status_code == 422 and "not allowed" in r.json()["detail"]
+
+
+def test_grade_without_sources_uses_the_reference(client):
+    c, _ = client
+    LLM_HOLDER["llm"] = ScriptedLLM(
+        {
+            "_GradeOutput": {
+                "points": [{"point": 1, "status": "partial", "reason": "r"}],
+                "contradicts_sources": False,
+                "feedback": "Close.",
+                "source_ids": [],
+            }
+        }
+    )
+    item = {"question": "Q?", "reference_answer": "Strings are immutable.", "answer": "you cannot change them"}
+    r = c.post("/v1/grade", headers=H, json={"user_id": "u1", "items": [item]})
+    assert r.status_code == 200, r.text
+    [res] = r.json()["results"]
+    assert (res["verdict"], res["score"], res["citations"]) == ("partial", 50, [])
+    assert "no source passages" in LLM_HOLDER["llm"].prompts[-1]

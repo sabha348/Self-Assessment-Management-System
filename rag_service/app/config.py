@@ -39,6 +39,10 @@ class Settings(BaseSettings):
 
     # Uploads.
     max_upload_mb: int = 25
+    # Hosts /v1/documents/from-url may download from (comma-separated suffixes).
+    source_url_hosts: str = "blob.vercel-storage.com"
+    # Connection pool size per instance (serverless: keep small; Neon free has ~100 connections).
+    db_pool_max: int = 3
 
     # Retrieval.
     default_top_k: int = 5
