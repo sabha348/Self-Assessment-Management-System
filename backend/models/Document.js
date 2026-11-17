@@ -33,6 +33,10 @@ const DocumentSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   },
+  // Vercel Blob (private) location, for PDFs uploaded on Vercel or copied there.
+  blobPathname: { type: String },
+  blobUrl: { type: String },
+  size: { type: Number },
   // Indexing in the RAG service (chunks + embeddings for grounded questions).
   ragStatus: {
     type: String,

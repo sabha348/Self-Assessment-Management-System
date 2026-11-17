@@ -243,7 +243,12 @@ def grade_answer(
             "incorrect", 0, ["missing"] * len(key_points), key_points,
             "No answer was given. Review the cited pages and try again.", [to_citation(h) for h in hits[:2]],
         )  # fmt: skip
-    sources, id_map = format_sources(hits)
+    if hits:
+        sources, id_map = format_sources(hits)
+    else:
+        # Questions created before grounding have no source chunks: grade against
+        # the reference answer and key points alone.
+        sources, id_map = "(no source passages: use the reference answer and key points)", {}
     out = llm.generate_json(grade_prompt(question, reference, key_points, sources, answer), _GradeOutput, 0.0)
 
     status = ["missing"] * len(key_points)

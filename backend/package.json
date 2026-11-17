@@ -6,6 +6,8 @@
   },
   "dependencies": {
     "@syncfusion/ej2-pdfviewer": "^28.2.7",
+    "@vercel/blob": "2.8.2",
+    "@vercel/functions": "3.10.5",
     "axios": "^1.7.9",
     "bcrypt": "^5.1.1",
     "bcryptjs": "^2.4.3",
@@ -24,5 +26,9 @@
     "openai": "^4.78.1",
     "python-shell": "^5.0.0",
     "stripe": "^17.7.0"
+  },
+  "type": "commonjs",
+  "engines": {
+    "node": "22.x"
   }
 }

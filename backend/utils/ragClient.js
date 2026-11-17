@@ -48,6 +48,17 @@ function createRagClient({
       return call(() => client.post('/v1/documents', form, { timeout: 15 * 60 * 1000 }));
     },
 
+    /** Index a PDF the RAG service downloads itself (signed Blob URL): no request-size limit. */
+    ingestFromUrl({ documentId, userId, title, url }) {
+      return call(() =>
+        client.post(
+          '/v1/documents/from-url',
+          { document_id: String(documentId), user_id: String(userId), title: title || '', source_url: url },
+          { timeout: 15 * 60 * 1000 }
+        )
+      );
+    },
+
     async deleteDocument({ documentId, userId }) {
       try {
         await call(() =>

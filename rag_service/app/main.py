@@ -18,6 +18,7 @@ from .ingest import OwnershipError, ingest_pdf
 from .llm import LLM, LLMError, build_llm
 from .pdf import PdfError
 from .retrieval import Mode, retrieve
+from .source import SourceError, fetch_pdf
 from .store import ChunkStore, SearchFilters
 
 
@@ -27,7 +28,7 @@ async def lifespan(app: FastAPI):
     from .db import make_pool, migrate
 
     migrate(settings.database_url)
-    pool = make_pool(settings.database_url)
+    pool = make_pool(settings.database_url, max_size=settings.db_pool_max)
     app.state.store = ChunkStore(pool)
     app.state.embedder = build_embedder(settings)
     app.state.llm = build_llm(settings)
@@ -169,6 +170,49 @@ def ingest_document(
     return IngestResponse(**result.__dict__)
 
 
+class IngestFromUrlRequest(BaseModel):
+    document_id: str = Field(min_length=1, max_length=64)
+    user_id: str = Field(min_length=1, max_length=64)
+    title: str = Field(default="", max_length=500)
+    source_url: str = Field(min_length=1, max_length=4000)
+
+
+@app.post("/v1/documents/from-url", response_model=IngestResponse, dependencies=[Authed])
+def ingest_document_from_url(
+    body: IngestFromUrlRequest,
+    settings: Settings = Depends(get_settings),
+    store: ChunkStore = Depends(get_store),
+    embedder: Embedder = Depends(get_embedder),
+):
+    """Same as POST /v1/documents, but the service downloads the PDF itself from a
+    short-lived signed storage URL (no 4.5 MB request-body limit)."""
+    try:
+        data = fetch_pdf(
+            body.source_url,
+            [h.strip() for h in settings.source_url_hosts.split(",")],
+            settings.max_upload_mb * 1024 * 1024,
+        )
+    except SourceError as e:
+        code = status.HTTP_413_CONTENT_TOO_LARGE if "larger" in str(e) else status.HTTP_422_UNPROCESSABLE_CONTENT
+        raise HTTPException(code, str(e)) from None
+    try:
+        result = ingest_pdf(
+            store=store,
+            embedder=embedder,
+            document_id=body.document_id,
+            user_id=body.user_id,
+            title=body.title,
+            data=data,
+            chunk_size=settings.chunk_size,
+            chunk_overlap=settings.chunk_overlap,
+        )
+    except OwnershipError:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "document belongs to another user") from None
+    except PdfError as e:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(e)) from None
+    return IngestResponse(**result.__dict__)
+
+
 @app.delete("/v1/documents/{document_id}", status_code=204, dependencies=[Authed])
 def delete_document(
     document_id: str,
@@ -269,7 +313,8 @@ class GradeItem(BaseModel):
     question: str = Field(min_length=1, max_length=4000)
     reference_answer: str = Field(min_length=1, max_length=8000)
     key_points: list[str] = Field(default_factory=list, max_length=10)
-    source_chunk_ids: list[str] = Field(min_length=1, max_length=10)
+    # Empty for questions made before grounding: graded against the reference only.
+    source_chunk_ids: list[str] = Field(default_factory=list, max_length=10)
     answer: str = Field(default="", max_length=8000)
 
 
@@ -300,7 +345,7 @@ def grade(
 ):
     def one(item: GradeItem):
         hits = store.get_chunks(item.source_chunk_ids, body.user_id)
-        if not hits:
+        if item.source_chunk_ids and not hits:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "source chunks not found for this user")
         return grade_answer(llm, item.question, item.reference_answer, item.key_points, hits, item.answer)
 

@@ -19,6 +19,7 @@
     "@syncfusion/ej2-base": "^28.2.5",
     "@syncfusion/ej2-react-buttons": "^28.2.7",
     "@syncfusion/ej2-react-pdfviewer": "^28.2.7",
+    "@vercel/blob": "2.8.2",
     "axios": "^1.7.9",
     "cra-template": "1.2.0",
     "dayjs": "^1.11.13",

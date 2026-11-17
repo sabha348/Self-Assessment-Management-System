@@ -9,3 +9,4 @@ psycopg-pool==3.3.0
 pgvector==0.5.1
 numpy==2.5.5
 google-genai==3.3.0
+httpx==0.28.1

@@ -1,78 +1,129 @@
 const multer = require('multer');
-const Document = require('../models/Document');
-const { GridFSBucket } = require('mongodb');
-const mongoose = require('mongoose');
 const stream = require('stream');
+const Document = require('../models/Document');
 const { getIndexer } = require('./ragIndexer');
 const { ragClient } = require('../utils/ragClient');
+const pdfStorage = require('./pdfStorage');
 
-// Configure multer to store in memory instead of disk
-const storage = multer.memoryStorage();
-const upload = multer({ storage: storage });
+// Direct uploads (local / Docker): the file arrives in the request and goes to GridFS.
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: pdfStorage.MAX_UPLOAD_MB * 1024 * 1024 },
+});
 
-// File upload route handler
+async function startIndexing(docId) {
+  try {
+    return (await getIndexer().scheduleIndex(docId)) ? 'pending' : 'none';
+  } catch (e) {
+    console.error('Could not schedule RAG indexing:', e.message);
+    return 'none';
+  }
+}
+
+/** Which upload path the browser should use. */
+const getUploadMode = (req, res) => {
+  res.json({ mode: pdfStorage.blobEnabled() ? 'blob' : 'direct', maxMb: pdfStorage.MAX_UPLOAD_MB });
+};
+
+/**
+ * Vercel Blob client uploads. The browser asks this route for a short-lived
+ * upload token (needs the user's JWT), then uploads straight to Blob, so the
+ * PDF never passes through this function's 4.5 MB request limit.
+ */
+const handleBlobUpload = async (req, res) => {
+  if (!pdfStorage.blobEnabled()) return res.status(404).json({ error: 'Blob uploads are not enabled' });
+  const { handleUpload } = require('@vercel/blob/client');
+  try {
+    const json = await handleUpload({
+      body: req.body,
+      request: req,
+      onBeforeGenerateToken: async (pathname) => {
+        // Only reached from the authenticated token request (see route).
+        if (!pdfStorage.isAllowedUploadPath(pathname, req.user.userId)) {
+          throw new Error('Uploads must be PDFs in your own folder');
+        }
+        return {
+          allowedContentTypes: ['application/pdf'],
+          maximumSizeInBytes: pdfStorage.MAX_UPLOAD_MB * 1024 * 1024,
+          addRandomSuffix: true,
+          tokenPayload: JSON.stringify({ userId: req.user.userId }),
+        };
+      },
+      // The document is registered by POST /register after the browser's upload
+      // resolves (this callback does not fire for localhost, and the register step
+      // also re-checks ownership), so there is nothing to do here.
+      onUploadCompleted: async () => {},
+    });
+    res.json(json);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+};
+
+/** After a Blob upload: verify the file exists and belongs to the user, then record it. */
+const registerBlobUpload = async (req, res) => {
+  if (!pdfStorage.blobEnabled()) return res.status(404).json({ error: 'Blob uploads are not enabled' });
+  const { pathname, title } = req.body || {};
+  const userId = req.user.userId;
+  if (!pdfStorage.isAllowedUploadPath(pathname, userId)) {
+    return res.status(403).json({ error: 'Not your upload' });
+  }
+  try {
+    const { head } = require('@vercel/blob');
+    const meta = await head(pathname);
+    const existing = await Document.findOne({ blobPathname: meta.pathname, uploadedBy: userId });
+    const doc =
+      existing ||
+      (await new Document({
+        title: String(title || pathname.split('/').pop()).slice(0, 300),
+        fileType: 'PDF',
+        uploadedBy: userId,
+        blobPathname: meta.pathname,
+        blobUrl: meta.url,
+        size: meta.size,
+        folderId: null,
+      }).save());
+    const ragStatus = existing ? existing.ragStatus : await startIndexing(doc._id);
+    res.status(200).json({ message: 'File uploaded successfully', _id: doc._id, title: doc.title, ragStatus });
+  } catch (error) {
+    console.error('Register upload error:', error.message);
+    res.status(404).json({ error: 'Uploaded file not found' });
+  }
+};
+
+// Direct upload route handler (GridFS)
 const uploadFile = async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
     }
-
-    const db = mongoose.connection.db;
-    const bucket = new GridFSBucket(db, { bucketName: 'pdfFiles' });
-    
-    // Create a readable stream from buffer
+    const { GridFSBucket } = require('mongodb');
+    const mongoose = require('mongoose');
+    const bucket = new GridFSBucket(mongoose.connection.db, { bucketName: pdfStorage.BUCKET });
     const readableStream = new stream.PassThrough();
     readableStream.end(req.file.buffer);
-    
-    // Create upload stream to GridFS
     const uploadStream = bucket.openUploadStream(req.file.originalname, {
-      metadata: {
-        uploadedBy: req.user.userId,
-        fileType: 'PDF',
-        folderId: null
-      }
+      metadata: { uploadedBy: req.user.userId, fileType: 'PDF', folderId: null },
     });
-    
-    // Track the file ID
     const fileId = uploadStream.id;
-    
-    // Stream the file to GridFS
     readableStream.pipe(uploadStream);
-    
-    // Handle upload completion
+
     uploadStream.on('finish', async () => {
-      // Create a minimal document reference
-      const docRef = new Document({
+      const docRef = await new Document({
         title: req.file.originalname,
         fileType: 'PDF',
         uploadedBy: req.user.userId,
-        gridFSId: fileId, // Store reference to GridFS file
-        folderId: null
-      });
-      
-      await docRef.save();
-
-      // Index for grounded questions in the background (minutes for a long PDF).
-      let ragStatus = 'none';
-      try {
-        if (await getIndexer().scheduleIndex(docRef._id)) ragStatus = 'pending';
-      } catch (e) {
-        console.error('Could not schedule RAG indexing:', e.message);
-      }
-
-      res.status(200).json({
-        message: 'File uploaded successfully',
-        _id: docRef._id,
-        title: docRef.title,
-        ragStatus
-      });
+        gridFSId: fileId,
+        size: req.file.size,
+        folderId: null,
+      }).save();
+      const ragStatus = await startIndexing(docRef._id);
+      res.status(200).json({ message: 'File uploaded successfully', _id: docRef._id, title: docRef.title, ragStatus });
     });
-    
     uploadStream.on('error', (error) => {
       console.error('GridFS upload error:', error);
       res.status(500).json({ error: 'File upload failed' });
     });
-    
   } catch (error) {
     console.error('Upload error:', error);
     res.status(500).json({ error: 'File upload failed' });
@@ -81,20 +132,9 @@ const uploadFile = async (req, res) => {
 
 const getFiles = async (req, res) => {
   try {
-    const { folderId } = req.query;
-    
-    // Build query based on user ID and optional folder ID
     const query = { uploadedBy: req.user.userId };
-    
-    // If folderId is specified, filter by that folder
-    if (folderId) {
-      query.folderId = folderId;
-    }
-    
-    const files = await Document.find(query)
-      .select('-content')  // Exclude the content field
-      .sort({ createdAt: -1 }); // Sort by newest first
-      
+    if (req.query.folderId) query.folderId = req.query.folderId;
+    const files = await Document.find(query).select('-content').sort({ createdAt: -1 });
     res.status(200).json(files);
   } catch (error) {
     console.error('Error fetching files:', error);
@@ -105,72 +145,30 @@ const getFiles = async (req, res) => {
 const getFileById = async (req, res) => {
   try {
     const docRef = await Document.findById(req.params.id);
-    if (!docRef) {
-      return res.status(404).json({ error: 'File not found' });
-    }
-    
-    // Check ownership
+    if (!docRef) return res.status(404).json({ error: 'File not found' });
     if (docRef.uploadedBy.toString() !== req.user.userId) {
       return res.status(403).json({ error: 'Not authorized to access this file' });
     }
-    
-    if (docRef.gridFSId) {
-      // Get file from GridFS
-      const db = mongoose.connection.db;
-      const bucket = new GridFSBucket(db, { bucketName: 'pdfFiles' });
-      
-      // Set appropriate headers
-      res.set('Content-Type', 'application/pdf');
-      
-      // Content-Disposition header with the filename from document title
-      // Use a more standardized header format
-      const safeFilename = encodeURIComponent(docRef.title || 'document.pdf');
-      res.set('Content-Disposition', `attachment; filename="${safeFilename}"`);
-      // Stream file to response
-      bucket.openDownloadStream(docRef.gridFSId).pipe(res);
-    } else {
-      // For backward compatibility - files stored directly in document
-      res.json(docRef);
-    }
+    await pdfStorage.streamToResponse(docRef, res);
   } catch (error) {
     console.error('Error fetching file:', error);
-    res.status(500).json({ error: 'Error fetching file' });
+    if (!res.headersSent) res.status(500).json({ error: 'Error fetching file' });
   }
 };
 
 const deleteFile = async (req, res) => {
   try {
-    const { id } = req.params;
-    
-    // Find the document first to get GridFS ID
-    const file = await Document.findById(id);
-    
-    if (!file) {
-      return res.status(404).json({ error: 'File not found' });
-    }
-    
-    // Check ownership
+    const file = await Document.findById(req.params.id);
+    if (!file) return res.status(404).json({ error: 'File not found' });
     if (file.uploadedBy.toString() !== req.user.userId) {
       return res.status(403).json({ error: 'Not authorized to delete this file' });
     }
-    
-    // If file is stored in GridFS, delete it from there first
-    if (file.gridFSId) {
-      const db = mongoose.connection.db;
-      const bucket = new GridFSBucket(db, { bucketName: 'pdfFiles' });
-      
-      try {
-        // Delete the file from GridFS
-        await bucket.delete(file.gridFSId);
-        console.log(`GridFS file ${file.gridFSId} deleted successfully`);
-      } catch (gridFsError) {
-        console.error('Error deleting from GridFS:', gridFsError);
-        // Continue with document deletion even if GridFS deletion fails
-        // This prevents orphaned references
-      }
+    try {
+      await pdfStorage.deleteStored(file);
+    } catch (storageError) {
+      // Continue: removing the record matters more than an orphaned blob.
+      console.error('Error deleting stored PDF:', storageError.message);
     }
-    
-    // Remove its chunks and embeddings from the RAG index too.
     if (ragClient.isEnabled()) {
       try {
         await ragClient.deleteDocument({ documentId: file._id, userId: file.uploadedBy });
@@ -178,10 +176,7 @@ const deleteFile = async (req, res) => {
         console.error('Error deleting from RAG index:', ragError.message);
       }
     }
-
-    // Then delete the document reference
-    await Document.findByIdAndDelete(id);
-    
+    await Document.findByIdAndDelete(req.params.id);
     res.status(200).json({ message: 'File deleted successfully' });
   } catch (error) {
     console.error('Delete error:', error);
@@ -194,5 +189,8 @@ module.exports = {
   uploadFile,
   getFiles,
   getFileById,
-  deleteFile
+  deleteFile,
+  getUploadMode,
+  handleBlobUpload,
+  registerBlobUpload,
 };

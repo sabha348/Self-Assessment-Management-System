@@ -1,12 +1,23 @@
 const express = require('express');
 const router = express.Router();
-const { getFiles, getFileById, uploadFile, deleteFile, upload } = require('../services/fileService');
+const {
+  getFiles, getFileById, uploadFile, deleteFile, upload, getUploadMode, handleBlobUpload, registerBlobUpload,
+} = require('../services/fileService');
 const {authenticateToken} = require('../middleware/authenticate');
 const Document = require('../models/Document');
 const { ragClient } = require('../utils/ragClient');
 const { getIndexer } = require('../services/ragIndexer');
 
+router.get('/upload-mode', authenticateToken, getUploadMode);
 router.post('/upload', authenticateToken, upload.single('file'), uploadFile);
+// Vercel Blob client uploads. The token request comes from the browser with the
+// user's JWT; Blob's own completion callback carries no JWT and is verified by
+// handleUpload's signature check instead.
+router.post('/blob-upload', (req, res, next) => {
+  if (req.body && req.body.type === 'blob.upload-completed') return handleBlobUpload(req, res);
+  return authenticateToken(req, res, () => handleBlobUpload(req, res, next));
+});
+router.post('/register', authenticateToken, registerBlobUpload);
 router.get('/', authenticateToken, getFiles);
 router.get('/:id', authenticateToken, getFileById);
 
